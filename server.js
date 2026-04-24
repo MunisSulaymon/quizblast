@@ -21,11 +21,32 @@ function generatePIN() {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-// Scoring with speed bonus
-function calculateScore(timeTaken, totalTime, isCorrect) {
-  if (!isCorrect) return 0;
-  const basePoints = 1000;
-  return Math.round(basePoints * (1 - ((timeTaken / totalTime) / 2)));
+/* ---- FISHER-YATES SHUFFLE ---- */
+function shuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function shuffleAnswers(question) {
+  const originalCorrect = question.answers[question.correctIndex];
+  const shuffled = shuffle(question.answers);
+  return {
+    ...question,
+    answers: shuffled,
+    correctIndex: shuffled.indexOf(originalCorrect)
+  };
+}
+
+/* ---- UPDATE calculateScore ---- */
+function calculateScore(timeTaken, totalTime, isCorrect, pointsType) {
+  if (!isCorrect || pointsType === 'none') return 0;
+  const base = Math.round(1000 * (1 - ((timeTaken / totalTime) / 2)));
+  if (pointsType === 'double') return base * 2;
+  return base;
 }
 
 // Streak multiplier
@@ -36,61 +57,112 @@ function getMultiplier(streak) {
   return 1.0;
 }
 
-// Server-side question timer
+/* ---- UPDATE startQuestion ---- */
 function startQuestion(pin) {
   const game = games.get(pin);
   if (!game) return;
-  
-  const question = game.questions[game.currentQuestion];
-  let timeLeft = question.timeLimit || 20;
+
+  const q = game.questions[game.currentQuestion];
+  const qSettings = q.settings || {};
+  let timeLeft = qSettings.timeLimit || 20;
+
   game.questionStartTime = Date.now();
   game.answersReceived = 0;
+  game.answerCounts = [0, 0, 0, 0];
   game.state = 'QUESTION';
-  game.answerCounts = [0,0,0,0]; // Reset counts for new question
 
-  io.to(pin).emit('nextQuestion', {
+  const payload = {
     questionIndex: game.currentQuestion,
     totalQuestions: game.questions.length,
-    question: question.question,
-    answers: question.answers,
-    timeLimit: timeLeft
-  });
+    question: game.settings?.showQuestionOnDevice ? q.question : null,
+    answers: q.answers,
+    timeLimit: timeLeft,
+    type: qSettings.questionType || 'quiz',
+    pointsType: qSettings.pointsType || 'standard'
+  };
 
+  // Show double points warning before question
+  if (qSettings.pointsType === 'double') {
+    io.to(pin).emit('doublePointsWarning');
+    setTimeout(() => {
+      io.to(pin).emit('nextQuestion', payload);
+      startTimer(pin, timeLeft);
+    }, 2500);
+  } else {
+    io.to(pin).emit('nextQuestion', payload);
+    startTimer(pin, timeLeft);
+  }
+}
+
+/* ---- SEPARATE TIMER FUNCTION ---- */
+function startTimer(pin, timeLeft) {
+  const game = games.get(pin);
+  if (!game) return;
   game.timer = setInterval(() => {
     timeLeft--;
     io.to(pin).emit('timerTick', timeLeft);
-
-    if (timeLeft <= 0 || game.answersReceived >= game.players.size) {
+    if (timeLeft <= 0 || 
+        game.answersReceived >= game.players.size) {
       clearInterval(game.timer);
       endRound(pin);
     }
   }, 1000);
 }
 
-// End round and send results
+/* ---- UPDATE endRound for autoPlay ---- */
 function endRound(pin) {
   const game = games.get(pin);
   if (!game) return;
   game.state = 'SCOREBOARD';
-  
-  const question = game.questions[game.currentQuestion];
-  const players = Array.from(game.players.values());
-  const sorted = players.sort((a, b) => b.score - a.score);
-  
+
+  const q = game.questions[game.currentQuestion];
+  const players = Array.from(game.players.values())
+    .sort((a,b) => b.score - a.score);
+
   io.to(pin).emit('roundResults', {
-    correctIndex: question.correctIndex,
-    correctAnswer: question.answers[question.correctIndex],
-    answerCounts: game.answerCounts || [0,0,0,0],
-    leaderboard: sorted.slice(0, 5).map((p, i) => ({
-      rank: i + 1,
-      name: p.name,
-      score: p.score
+    correctIndex: q.correctIndex,
+    correctAnswer: q.answers[q.correctIndex],
+    answerCounts: game.answerCounts,
+    leaderboard: players.slice(0,5).map((p,i) => ({
+      rank: i+1, name: p.name, score: p.score
     })),
-    allPlayers: sorted.map(p => ({
-      name: p.name,
-      score: p.score
-    }))
+    allPlayers: players
   });
+
+  // Auto-play countdown
+  if (game.settings?.autoPlay) {
+    let countdown = 5;
+    const autoInterval = setInterval(() => {
+      io.to(pin).emit('autoAdvanceCountdown', countdown);
+      countdown--;
+      if (countdown < 0) {
+        clearInterval(autoInterval);
+        io.to(pin).emit('autoAdvanceDone');
+        advanceGame(pin);
+      }
+    }, 1000);
+  }
+}
+
+/* ---- ADVANCE GAME LOGIC ---- */
+function advanceGame(pin) {
+  const game = games.get(pin);
+  if (!game) return;
+
+  game.currentQuestion++;
+  game.players.forEach(p => { p.answered = false; });
+
+  if (game.currentQuestion >= game.questions.length) {
+    const allPlayers = Array.from(game.players.values())
+      .sort((a,b) => b.score - a.score);
+    io.to(pin).emit('podium', {
+      winners: allPlayers.slice(0,3),
+      allPlayers
+    });
+    games.delete(pin);
+  } else {
+    startQuestion(pin);
+  }
 }
 
 io.on('connection', (socket) => {
@@ -103,25 +175,53 @@ io.on('connection', (socket) => {
       players: new Map(),
       questions: quizData.questions,
       title: quizData.title,
+      settings: quizData.settings,
       currentQuestion: 0,
       state: 'LOBBY',
       timer: null,
       answersReceived: 0,
-      answerCounts: [0,0,0,0],
-      questionStartTime: null
+      answerCounts: [0, 0, 0, 0],
+      questionStartTime: null,
+      locked: false
     });
     socket.join(pin);
     socket.emit('gameCreated', { pin });
+  });
+
+  /* ---- LOCK ROOM ---- */
+  socket.on('lockRoom', ({ pin, locked }) => {
+    const game = games.get(pin);
+    if (game && game.hostId === socket.id) {
+      game.locked = locked;
+      io.to(pin).emit('roomLockStatus', locked);
+    }
+  });
+
+  /* ---- SKIP QUESTION ---- */
+  socket.on('skipQuestion', (pin) => {
+    const game = games.get(pin);
+    if (game && game.hostId === socket.id) {
+      clearInterval(game.timer);
+      endRound(pin);
+    }
   });
 
   // PLAYER: Join game
   socket.on('joinGame', ({ pin, name }) => {
     const game = games.get(pin);
     if (!game) return socket.emit('errorMsg', 'Invalid PIN code.');
+    if (game.locked) return socket.emit('errorMsg', '🔒 This room is locked.');
     if (game.state !== 'LOBBY') return socket.emit('errorMsg', 'Game already in progress.');
+    
     const nameTaken = Array.from(game.players.values()).some(p => p.name === name);
     if (nameTaken) return socket.emit('errorMsg', 'Nickname already taken.');
-    
+
+    const badWords = ['badword1', 'badword2'];
+    if (game.settings?.nicknameFilter) {
+      const hasBad = badWords.some(w => name.toLowerCase().includes(w));
+      if (hasBad) return socket.emit('errorMsg', 'Please choose an appropriate nickname.');
+    }
+
     game.players.set(socket.id, {
       name, score: 0, streak: 0,
       answered: false, lastCorrect: false,
@@ -139,6 +239,12 @@ io.on('connection', (socket) => {
   socket.on('startGame', (pin) => {
     const game = games.get(pin);
     if (game && game.hostId === socket.id) {
+      if (game.settings?.randomizeQuestions) {
+        game.questions = shuffle(game.questions);
+      }
+      if (game.settings?.randomizeAnswers) {
+        game.questions = game.questions.map(shuffleAnswers);
+      }
       startQuestion(pin);
     }
   });
@@ -147,25 +253,26 @@ io.on('connection', (socket) => {
   socket.on('submitAnswer', ({ pin, answerIndex }) => {
     const game = games.get(pin);
     if (!game || game.state !== 'QUESTION') return;
-    
+
     const player = game.players.get(socket.id);
     if (!player || player.answered) return;
-    
+
     player.answered = true;
     game.answersReceived++;
-    
+
     const timeTaken = (Date.now() - game.questionStartTime) / 1000;
     const question = game.questions[game.currentQuestion];
     const isCorrect = answerIndex === question.correctIndex;
-    
-    if (!game.answerCounts) game.answerCounts = [0,0,0,0];
+    const qSettings = question.settings || {};
+
+    if (!game.answerCounts) game.answerCounts = [0, 0, 0, 0];
     game.answerCounts[answerIndex]++;
-    
+
     if (isCorrect) {
       player.streak++;
       const multiplier = getMultiplier(player.streak);
       const points = Math.round(
-        calculateScore(timeTaken, question.timeLimit || 20, true) * multiplier
+        calculateScore(timeTaken, qSettings.timeLimit || 20, true, qSettings.pointsType || 'standard') * multiplier
       );
       player.score += points;
       player.lastPoints = points;
@@ -177,7 +284,7 @@ io.on('connection', (socket) => {
     }
 
     const allPlayers = Array.from(game.players.values());
-    const sorted = allPlayers.sort((a,b) => b.score - a.score);
+    const sorted = allPlayers.sort((a, b) => b.score - a.score);
     const rank = sorted.findIndex(p => p.name === player.name) + 1;
 
     socket.emit('answerResult', {
@@ -201,25 +308,7 @@ io.on('connection', (socket) => {
   socket.on('nextQuestion', (pin) => {
     const game = games.get(pin);
     if (!game || game.hostId !== socket.id) return;
-    
-    game.currentQuestion++;
-    game.answerCounts = [0,0,0,0];
-    
-    // Reset player answered state
-    game.players.forEach(p => { p.answered = false; });
-
-    if (game.currentQuestion >= game.questions.length) {
-      // Game over — send podium
-      const allPlayers = Array.from(game.players.values())
-        .sort((a,b) => b.score - a.score);
-      io.to(pin).emit('podium', {
-        winners: allPlayers.slice(0, 3),
-        allPlayers
-      });
-      games.delete(pin);
-    } else {
-      startQuestion(pin);
-    }
+    advanceGame(pin);
   });
 
   // DISCONNECT handling
@@ -243,5 +332,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`QuizBlast running on port ${PORT}`);
+  console.log(`QuizBlast server running on port ${PORT}`);
 });
