@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Mobile viewport -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+    <!-- PWA / Mobile app feel -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- SEO -->
+    <meta name="description" content="QuizBlast - Free real-time multiplayer quiz game. Create and play Kahoot-style quizzes with friends!">
+    <meta name="keywords" content="quiz game, kahoot, multiplayer quiz, free quiz, classroom game">
+
+    <!-- Open Graph (looks good when shared on WhatsApp etc) -->
+    <meta property="og:title" content="QuizBlast 🎮">
+    <meta property="og:description" content="Free real-time multiplayer quiz game!">
+    <meta property="og:type" content="website">
+
+    <title>Join | QuizBlast 🎮</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+    <div id="join-screen" class="screen active">
+        <h1 class="big-title" style="font-size: 3rem;">QuizBlast 🎮</h1>
+        <div class="builder-card" style="max-width: 400px;">
+            <div class="input-group">
+                <label>Game PIN</label>
+                <input type="number" id="join-pin" placeholder="000000" maxlength="6">
+            </div>
+            <div class="input-group">
+                <label>Nickname</label>
+                <input type="text" id="join-name" placeholder="SuperPlayer" maxlength="15">
+            </div>
+            <div id="error-msg" style="color: var(--red-answer); margin-bottom: 1rem; font-weight: 700; text-align: center;" class="hidden"></div>
+            <button id="join-btn" style="background: var(--green-answer); color: white; width: 100%; font-size: 1.5rem;">🎮 Join Game</button>
+        </div>
+    </div>
+
+    <div id="waiting-screen" class="screen">
+        <h1 style="font-size: 3rem;">You're in! 🎉</h1>
+        <h2 id="display-name" style="margin: 2rem 0; color: var(--yellow-answer);">---</h2>
+        <p style="font-size: 1.2rem;">Waiting for host to start the game<span class="dots">...</span></p>
+    </div>
+
+    <div id="question-screen" class="screen">
+        <div class="timer-container">
+            <div id="player-timer-bar" class="timer-bar"></div>
+        </div>
+        <div style="position: absolute; top: 2rem; left: 2rem;" id="player-q-num">Q 1 of X</div>
+        <div id="player-timer-num" class="timer-num" style="font-size: 3rem; margin-top: 1rem;">20</div>
+        
+        <h2 style="margin: 2rem 0; text-align: center;" id="player-q-text">Look at the Host screen!</h2>
+
+        <div class="game-grid">
+            <button class="btn-answer red" data-idx="0">▲</button>
+            <button class="btn-answer blue" data-idx="1">◆</button>
+            <button class="btn-answer yellow" data-idx="2">●</button>
+            <button class="btn-answer green" data-idx="3">■</button>
+        </div>
+        <div id="lock-msg" class="hidden" style="margin-top: 2rem; font-size: 1.5rem; font-weight: 700;">Answer locked in! ⏳</div>
+    </div>
+
+    <div id="feedback-screen" class="screen">
+        <div id="feedback-full" class="feedback-full">
+            <div id="feedback-main" class="feedback-text">---</div>
+            <div id="feedback-points" class="feedback-sub">+0 points</div>
+            <div id="streak-msg" class="feedback-sub" style="margin-top: 1rem; color: #ffeb3b;"></div>
+            
+            <div style="margin-top: 3rem;">
+                <p>Total Score: <span id="total-score-val">0</span> pts</p>
+                <p>Rank: <span id="rank-val">#0</span> of <span id="total-players-val">0</span></p>
+            </div>
+            <div id="correct-ans-reveal" style="margin-top: 1rem; font-style: italic;" class="hidden"></div>
+        </div>
+    </div>
+
+    <div id="leaderboard-screen" class="screen">
+        <h1>📊 Leaderboard</h1>
+        <div id="player-leaderboard-list" class="leaderboard-list"></div>
+        <p style="margin-top: 2rem; opacity: 0.8;">Next question coming up...</p>
+    </div>
+
+    <div id="podium-screen" class="screen">
+        <h1 style="font-size: 3rem;">Game Over!</h1>
+        <div id="final-medal" style="font-size: 5rem; margin: 1rem 0;"></div>
+        <h2 id="final-rank-msg">Your Rank: #0</h2>
+        <p style="font-size: 1.5rem; margin-top: 1rem;">Final Score: <span id="final-score-val">0</span> pts</p>
+        
+        <div style="margin-top: 3rem; text-align: center;">
+            <p>🎮 Thanks for playing QuizBlast!</p>
+            <a href="index.html"><button style="margin-top: 2rem; background: var(--white); color: var(--primary-purple);">Back to Home</button></a>
+        </div>
+    </div>
+
+    <style>
+        .dots::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0% { content: ''; }
+            33% { content: '.'; }
+            66% { content: '..'; }
+            100% { content: '...'; }
+        }
+    </style>
+
+    <script src="player.js"></script>
+</body>
+</html>
