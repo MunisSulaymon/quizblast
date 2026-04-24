@@ -23,6 +23,7 @@
                 <label>Quiz Title</label>
                 <input type="text" id="quiz-title" placeholder="Enter awesome title...">
             </div>
+            <div id="host-error-msg" class="error-msg hidden"></div>
 
             <div id="questions-list" style="margin-bottom: 1.5rem;"></div>
 
@@ -111,6 +112,7 @@
             <div class="answer-panel green"><span class="shape-icon">■</span> <span id="ans-text-3">Answer D</span>
             </div>
         </div>
+        <div id="streak-display" class="hidden"></div>
     </div>
 
     <div id="results-screen" class="screen">
@@ -148,7 +150,7 @@
 
     <div id="podium-screen" class="screen">
         <h1>🏆 Final Podium 🏆</h1>
-        <div class="podium-container">
+        <div id="podium-places" class="podium-container">
             <div class="podium-place">
                 <div id="podium-2" style="font-weight: 700; margin-bottom: 0.5rem;">---</div>
                 <div class="podium-bar second">2nd</div>
@@ -163,7 +165,9 @@
             </div>
         </div>
 
-        <div id="full-leaderboard" class="leaderboard-list"></div>
+        <div id="final-rankings" class="final-list">
+            <div id="full-leaderboard" class="leaderboard-list"></div>
+        </div>
         <button id="play-again-btn"
             style="background: var(--white); color: var(--primary-purple); font-size: 1.5rem; margin-top: 3rem;">🔄 Play
             Again</button>

@@ -718,3 +718,89 @@ input:checked + .slider:before { transform: translateX(24px); }
   .tf-grid { height: 160px; }
   .announcement-overlay h1 { font-size: 2.5rem; }
 }
+
+/* Player question card */
+.player-q-card {
+  background: rgba(255,255,255,0.15);
+  border-radius: 16px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+.player-q-card h2 {
+  color: white;
+  font-size: 1.2rem;
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Medal styling */
+.medal {
+  font-size: 3rem;
+  display: block;
+  text-align: center;
+}
+
+/* Podium places */
+.podium-place {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(255,255,255,0.1);
+  border-radius: 16px;
+  min-width: 100px;
+}
+.podium-place.place-1 { order: 2; }
+.podium-place.place-2 { order: 1; }
+.podium-place.place-3 { order: 3; }
+.podium-container {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+.podium-name {
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-top: 0.5rem;
+}
+.podium-score {
+  color: #FFD700;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Error message */
+.error-msg {
+  background: #eb1727;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin: 8px 0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Host notification */
+.notification {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  z-index: 999;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Final rankings list */
+.final-list {
+  max-width: 400px;
+  margin: 0 auto;
+  max-height: 300px;
+  overflow-y: auto;
+}

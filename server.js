@@ -98,6 +98,12 @@ function startQuestion(pin) {
 function startTimer(pin, timeLeft) {
   const game = games.get(pin);
   if (!game) return;
+  
+  if (game.timer) {
+    clearInterval(game.timer);
+    game.timer = null;
+  }
+
   game.timer = setInterval(() => {
     timeLeft--;
     io.to(pin).emit('timerTick', timeLeft);
@@ -169,7 +175,11 @@ io.on('connection', (socket) => {
 
   // HOST: Create game
   socket.on('createGame', (quizData) => {
-    const pin = generatePIN();
+    let pin;
+    do {
+      pin = generatePIN();
+    } while (games.has(pin));
+
     games.set(pin, {
       hostId: socket.id,
       players: new Map(),
@@ -201,7 +211,7 @@ io.on('connection', (socket) => {
   socket.on('skipQuestion', (pin) => {
     const game = games.get(pin);
     if (game && game.hostId === socket.id) {
-      clearInterval(game.timer);
+      if (game.timer) clearInterval(game.timer);
       endRound(pin);
     }
   });
@@ -238,15 +248,16 @@ io.on('connection', (socket) => {
   // HOST: Start game
   socket.on('startGame', (pin) => {
     const game = games.get(pin);
-    if (game && game.hostId === socket.id) {
-      if (game.settings?.randomizeQuestions) {
-        game.questions = shuffle(game.questions);
-      }
-      if (game.settings?.randomizeAnswers) {
-        game.questions = game.questions.map(shuffleAnswers);
-      }
-      startQuestion(pin);
+    if (!game || game.hostId !== socket.id) return;
+    if (game.state !== 'LOBBY') return; // GUARD
+
+    if (game.settings?.randomizeQuestions) {
+      game.questions = shuffle(game.questions);
     }
+    if (game.settings?.randomizeAnswers) {
+      game.questions = game.questions.map(shuffleAnswers);
+    }
+    startQuestion(pin);
   });
 
   // PLAYER: Submit answer

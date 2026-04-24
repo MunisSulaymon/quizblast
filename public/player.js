@@ -2,6 +2,8 @@ const socket = io();
 let myName = '';
 let myPin = '';
 let myScore = 0;
+let hasAnswered = false;
+let questionStartTime = Date.now();
 
 // DOM Elements
 const screens = ['join-screen', 'waiting-screen', 'question-screen', 'feedback-screen', 'leaderboard-screen', 'podium-screen'];
@@ -96,6 +98,8 @@ socket.on('nextQuestion', (data) => {
   }
 
   // Reset Timer Bar
+  hasAnswered = false;
+  questionStartTime = Date.now();
   const timerBar = document.getElementById('player-timer-bar');
   timerBar.style.width = '100%';
   timerBar.style.transition = 'none';
@@ -138,7 +142,14 @@ function renderQuizGrid(answers) {
 }
 
 function submitAnswer(idx) {
-    socket.emit('submitAnswer', { pin: myPin, answerIndex: idx });
+    if (hasAnswered) return;
+    hasAnswered = true;
+
+    socket.emit('submitAnswer', { 
+        pin: myPin, 
+        answerIndex: idx,
+        timeTaken: (Date.now() - questionStartTime) / 1000
+    });
     
     // Disable buttons
     const buttons = document.querySelectorAll('.btn-answer, .btn-tf');

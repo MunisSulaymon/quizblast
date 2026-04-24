@@ -1,6 +1,7 @@
 const socket = io();
 let currentPin = null;
 let globalQuestionsArray = [];
+let currentTimeLimit = 20;
 
 // DOM Elements
 const screens = ['builder-screen', 'lobby-screen', 'question-screen', 'results-screen', 'podium-screen'];
@@ -123,6 +124,14 @@ function showStreakBadge(streak) {
   }
 }
 
+function showNotification(msg) {
+  const el = document.createElement('div');
+  el.className = 'notification';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
 /* ---- BUILDER LOGIC ---- */
 function addQuestion() {
   const idx = globalQuestionsArray.length;
@@ -227,9 +236,42 @@ socket.on('gameCreated', ({ pin }) => {
 socket.on('playerJoined', ({ players, count }) => {
   document.getElementById('player-count').innerText = `${count} players joined`;
   document.getElementById('lobby-player-list').innerHTML = players.map(name => `
-    <div class="player-tag">${name}</div>
+    <div class="player-tag player-item">${name}</div>
   `).join('');
   document.getElementById('start-game-btn').disabled = count === 0;
+});
+
+socket.on('playerLeft', ({ name, count }) => {
+  document.getElementById('player-count').innerText = `${count} players joined`;
+  const playerList = document.getElementById('lobby-player-list');
+  if (playerList) {
+    const items = playerList.querySelectorAll('.player-item');
+    items.forEach(item => {
+      if (item.textContent.trim() === name) {
+        item.remove();
+      }
+    });
+  }
+  showNotification(`${name} left the game`);
+});
+
+socket.on('errorMsg', (msg) => {
+  const errDiv = document.getElementById('host-error-msg');
+  if (errDiv) {
+    errDiv.textContent = msg;
+    errDiv.classList.remove('hidden');
+    setTimeout(() => errDiv.classList.add('hidden'), 3000);
+  } else {
+    alert('Error: ' + msg);
+  }
+});
+
+socket.on('roomLockStatus', (locked) => {
+  const btn = document.getElementById('lock-btn');
+  if (btn) {
+    btn.textContent = locked ? '🔒 Locked' : '🔓 Unlocked';
+    btn.classList.toggle('locked', locked);
+  }
 });
 
 document.getElementById('start-game-btn').addEventListener('click', () => {
@@ -241,6 +283,7 @@ socket.on('doublePointsWarning', () => {
 });
 
 socket.on('nextQuestion', ({ questionIndex, totalQuestions, question, answers, timeLimit, type, pointsType }) => {
+  currentTimeLimit = timeLimit;
   document.getElementById('q-progress').innerText = `Question ${questionIndex + 1} of ${totalQuestions}`;
   document.getElementById('host-question-text').innerText = question || 'Look at your device!';
   
@@ -265,6 +308,7 @@ socket.on('nextQuestion', ({ questionIndex, totalQuestions, question, answers, t
   const timerBar = document.getElementById('timer-bar');
   timerBar.style.width = '100%';
   timerBar.style.transition = 'none';
+  timerBar.style.background = '#1368CE';
   setTimeout(() => {
     timerBar.style.transition = `width ${timeLimit}s linear`;
     timerBar.style.width = '0%';
@@ -275,6 +319,15 @@ socket.on('nextQuestion', ({ questionIndex, totalQuestions, question, answers, t
 
 socket.on('timerTick', (timeLeft) => {
   document.getElementById('host-timer-num').innerText = timeLeft;
+  
+  const bar = document.getElementById('timer-bar');
+  if (bar && currentTimeLimit) {
+    const pct = (timeLeft / currentTimeLimit) * 100;
+    // Bar width is mostly handled by CSS transition, but we sync color here
+    if (pct < 30) bar.style.background = '#eb1727';
+    else if (pct < 60) bar.style.background = '#D89E00';
+    else bar.style.background = '#1368CE';
+  }
 });
 
 socket.on('playerAnswered', ({ count, total }) => {
@@ -322,14 +375,23 @@ document.getElementById('next-q-btn').addEventListener('click', () => {
 });
 
 socket.on('podium', ({ winners, allPlayers }) => {
-  document.getElementById('podium-1').innerText = winners[0] ? winners[0].name : '---';
-  document.getElementById('podium-2').innerText = winners[1] ? winners[1].name : '---';
-  document.getElementById('podium-3').innerText = winners[2] ? winners[2].name : '---';
+  const medals = ['🥇','🥈','🥉'];
+  const podiumPlaces = document.getElementById('podium-places');
+  if (podiumPlaces) {
+    podiumPlaces.innerHTML = winners.map((p, i) => `
+      <div class="podium-place place-${i+1}">
+        <div class="medal">${medals[i]}</div>
+        <div class="podium-name">${p.name}</div>
+        <div class="podium-score">${p.score} pts</div>
+      </div>
+    `).join('');
+  }
 
   document.getElementById('full-leaderboard').innerHTML = allPlayers.map((p, i) => `
     <div class="lb-item">
-      <span>#${i + 1} ${p.name}</span>
-      <span>${p.score} pts</span>
+      <span class="rank">#${i + 1}</span>
+      <span class="name">${p.name}</span>
+      <span class="score">${p.score} pts</span>
     </div>
   `).join('');
 
