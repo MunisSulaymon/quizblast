@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - QuizBlast 🎮</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dashboard-page">
+
+  <!-- TOP NAVBAR -->
+  <nav class="dash-nav">
+    <div class="dash-logo">QuizBlast 🎮</div>
+    <div class="dash-user">
+      Welcome, <strong id="nav-username">Host</strong>
+    </div>
+    <button onclick="logout()" class="btn-logout">
+      🚪 Logout
+    </button>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="dash-container">
+    
+    <!-- TABS -->
+    <div class="dash-tabs">
+      <button onclick="switchTab('quizzes')" 
+        id="tab-quizzes" class="dash-tab active">
+        📚 My Quizzes
+      </button>
+      <button onclick="switchTab('analytics')" 
+        id="tab-analytics" class="dash-tab">
+        📊 Analytics
+      </button>
+    </div>
+
+    <!-- MY QUIZZES TAB -->
+    <div id="quizzes-tab" class="tab-pane">
+      <div class="tab-header">
+        <h2>My Quiz Library</h2>
+        <button onclick="location.href='host.html'" 
+          class="btn-create-new">
+          ➕ Create New Quiz
+        </button>
+      </div>
+      <div id="quiz-grid" class="quiz-grid">
+        <div class="loading">Loading quizzes...</div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="analytics-tab" class="tab-pane hidden">
+      
+      <!-- STAT CARDS -->
+      <div class="stats-row">
+        <div class="stat-card purple">
+          <div class="stat-icon">🎮</div>
+          <div class="stat-number" id="stat-games">0</div>
+          <div class="stat-label">Games Played</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">👥</div>
+          <div class="stat-number" id="stat-players">0</div>
+          <div class="stat-label">Total Players</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-number" id="stat-score">0</div>
+          <div class="stat-label">Avg Score</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-number" id="stat-accuracy">0%</div>
+          <div class="stat-label">Avg Accuracy</div>
+        </div>
+      </div>
+
+      <!-- SESSIONS TABLE -->
+      <div class="sessions-section">
+        <h2>Recent Games</h2>
+        <div id="sessions-list">
+          <div class="loading">Loading analytics...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SESSION DETAIL MODAL -->
+  <div id="detail-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <button onclick="closeModal()" 
+        class="modal-close">✕</button>
+      <h2 id="modal-title">Game Results</h2>
+      
+      <!-- CHART ROW -->
+      <div class="charts-row">
+        <div class="chart-box">
+          <h3>Player Scores</h3>
+          <canvas id="score-chart"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3>Overall Accuracy</h3>
+          <canvas id="accuracy-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- QUESTION STATS TABLE -->
+      <div class="q-stats-section">
+        <h3>Question Analysis</h3>
+        <table class="q-stats-table">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>% Correct</th>
+              <th>Avg Time</th>
+              <th>Difficulty</th>
+            </tr>
+          </thead>
+          <tbody id="q-stats-body"></tbody>
+        </table>
+      </div>
+
+      <!-- PLAYER TABLE -->
+      <div class="players-section">
+        <h3>Player Rankings</h3>
+        <table class="players-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Player</th>
+              <th>Score</th>
+              <th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody id="players-body"></tbody>
+        </table>
+      </div>
+
+      <!-- EXPORT BUTTON -->
+      <button onclick="exportCSV()" class="btn-export">
+        📥 Export CSV
+      </button>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

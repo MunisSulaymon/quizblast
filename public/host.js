@@ -2,6 +2,7 @@ const socket = io();
 let currentPin = null;
 let globalQuestionsArray = [];
 let currentTimeLimit = 20;
+let savedQuizId = null;
 
 // DOM Elements
 const screens = ['builder-screen', 'lobby-screen', 'question-screen', 'results-screen', 'podium-screen'];
@@ -12,7 +13,92 @@ function goToScreen(targetId) {
   });
   // Show settings gear only on builder and lobby
   const gear = document.getElementById('settings-toggle-btn');
-  gear.style.display = (targetId === 'builder-screen' || targetId === 'lobby-screen') ? 'block' : 'none';
+  if (gear) {
+    gear.style.display = (targetId === 'builder-screen' || targetId === 'lobby-screen') ? 'block' : 'none';
+  }
+}
+
+window.onload = () => {
+  // Check if loading a saved quiz
+  const loadedQuiz = localStorage.getItem('loadedQuiz');
+  const editQuiz = localStorage.getItem('editQuiz');
+
+  if (loadedQuiz) {
+    const quiz = JSON.parse(loadedQuiz);
+    localStorage.removeItem('loadedQuiz');
+    loadQuizIntoGame(quiz);
+  } else if (editQuiz) {
+    const quiz = JSON.parse(editQuiz);
+    localStorage.removeItem('editQuiz');
+    savedQuizId = quiz._id;
+    loadQuizIntoBuilder(quiz);
+  }
+};
+
+function loadQuizIntoGame(quiz) {
+  // Load quiz data and go directly to lobby
+  document.getElementById('quiz-title').value = quiz.title;
+  globalQuestionsArray = quiz.questions;
+  savedQuizId = quiz._id;
+  createGame(); // Auto-start game with loaded quiz
+}
+
+function loadQuizIntoBuilder(quiz) {
+  // Load quiz into builder for editing
+  document.getElementById('quiz-title').value = quiz.title;
+  globalQuestionsArray = [];
+  const container = document.getElementById('questions-list');
+  if (container) container.innerHTML = '';
+  quiz.questions.forEach((q, i) => {
+    globalQuestionsArray.push(q);
+    renderQuestionCard(q, i);
+  });
+}
+
+function renderQuestionCard(q, idx) {
+  const card = document.createElement('div');
+  card.className = 'question-card builder-card';
+  card.style.marginTop = '1rem';
+  card.innerHTML = `
+    <div class="q-header" style="font-weight: 700; margin-bottom: 0.5rem;">Question ${idx + 1}</div>
+    <input type="text" placeholder="Enter question..." 
+      value="${q.question}"
+      oninput="globalQuestionsArray[${idx}].question=this.value" style="margin-bottom: 1rem;">
+    <div class="answers-grid">
+      ${['A', 'B', 'C', 'D'].map((l, i) => `
+        <div class="answer-row" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <input type="radio" name="correct-${idx}" 
+            value="${i}" ${i === q.correctIndex ? 'checked' : ''} 
+            onchange="globalQuestionsArray[${idx}].correctIndex=${i}" style="width: auto;">
+          <input type="text" placeholder="Answer ${l}..."
+            value="${q.answers[i] || ''}"
+            oninput="globalQuestionsArray[${idx}].answers[${i}]=this.value">
+        </div>
+      `).join('')}
+    </div>
+    <details>
+      <summary>⚙️ Question Settings</summary>
+      <div class="q-settings-grid">
+        <select onchange="globalQuestionsArray[${idx}].settings.timeLimit=+this.value">
+          <option value="10" ${q.settings?.timeLimit === 10 ? 'selected' : ''}>10s</option>
+          <option value="20" ${q.settings?.timeLimit === 20 || !q.settings?.timeLimit ? 'selected' : ''}>20s</option>
+          <option value="30" ${q.settings?.timeLimit === 30 ? 'selected' : ''}>30s</option>
+          <option value="60" ${q.settings?.timeLimit === 60 ? 'selected' : ''}>60s</option>
+        </select>
+        <select onchange="globalQuestionsArray[${idx}].settings.pointsType=this.value">
+          <option value="standard" ${q.settings?.pointsType === 'standard' ? 'selected' : ''}>⭐ Standard</option>
+          <option value="double" ${q.settings?.pointsType === 'double' ? 'selected' : ''}>🔥 Double</option>
+          <option value="none" ${q.settings?.pointsType === 'none' ? 'selected' : ''}>🚫 No Points</option>
+        </select>
+        <select onchange="globalQuestionsArray[${idx}].settings.questionType=this.value">
+          <option value="quiz" ${q.settings?.questionType === 'quiz' ? 'selected' : ''}>📝 Quiz</option>
+          <option value="true-false" ${q.settings?.questionType === 'true-false' ? 'selected' : ''}>✅ True/False</option>
+          <option value="poll" ${q.settings?.questionType === 'poll' ? 'selected' : ''}>📊 Poll</option>
+        </select>
+      </div>
+    </details>
+  `;
+  document.getElementById('questions-list').appendChild(card);
 }
 
 function showError(msg) {
@@ -199,15 +285,52 @@ function updateCreateBtn() {
 
 document.getElementById('quiz-title').addEventListener('input', updateCreateBtn);
 
-function createGame() {
+// Update createGame to send auth info and save quiz
+async function createGame() {
   const title = document.getElementById('quiz-title').value.trim();
-  if (!title) return showError('Please enter a quiz title');
-  if (globalQuestionsArray.length === 0) return showError('Add at least one question');
+  if (!title) return showNotification('Please enter a quiz title');
+  if (globalQuestionsArray.length === 0) 
+    return showNotification('Add at least one question');
+
+  // Check if logged in
+  let hostId_db = null;
+  let quizId_db = savedQuizId;
+  
+  try {
+    const res = await fetch('/api/auth/me');
+    if (res.ok) {
+      const user = await res.json();
+      hostId_db = user._id;
+      
+      // Save quiz to database if logged in
+      if (!savedQuizId) {
+        const saveRes = await fetch('/api/quizzes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            questions: globalQuestionsArray,
+            settings: collectSettings()
+          })
+        });
+        if (saveRes.ok) {
+          const saved = await saveRes.json();
+          quizId_db = saved._id;
+          savedQuizId = saved._id;
+          showNotification('Quiz saved! ✓');
+        }
+      }
+    }
+  } catch (e) {
+    // Guest mode - continue without saving
+  }
 
   const quizData = {
     title,
     questions: globalQuestionsArray,
-    settings: collectSettings()
+    settings: collectSettings(),
+    hostId_db,
+    quizId_db
   };
   socket.emit('createGame', quizData);
 }

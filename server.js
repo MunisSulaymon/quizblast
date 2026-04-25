@@ -4,6 +4,10 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
 const cors = require('cors');
+const mongoose = require('mongoose');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const GameResult = require('./models/GameResult');
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,6 +15,11 @@ const io = new Server(httpServer, {
   cors: { origin: process.env.CLIENT_URL || "*", methods: ["GET", "POST"] }
 });
 
+app.use(helmet({ 
+  contentSecurityPolicy: false 
+}));
+app.use(express.json());
+app.use(cookieParser());
 app.use(express.static('public'));
 
 // Game storage
@@ -151,7 +160,7 @@ function endRound(pin) {
 }
 
 /* ---- ADVANCE GAME LOGIC ---- */
-function advanceGame(pin) {
+async function advanceGame(pin) {
   const game = games.get(pin);
   if (!game) return;
 
@@ -161,6 +170,7 @@ function advanceGame(pin) {
   if (game.currentQuestion >= game.questions.length) {
     const allPlayers = Array.from(game.players.values())
       .sort((a,b) => b.score - a.score);
+    await saveGameResult(pin);  // ADD THIS
     io.to(pin).emit('podium', {
       winners: allPlayers.slice(0,3),
       allPlayers
@@ -170,6 +180,64 @@ function advanceGame(pin) {
     startQuestion(pin);
   }
 }
+
+// ADD saveGameResult() function BEFORE io.on():
+async function saveGameResult(pin) {
+  const game = games.get(pin);
+  if (!game || !game.hostId_db) return;
+  
+  try {
+    const players = Array.from(game.players.values());
+    const totalAnswers = players.length * game.questions.length;
+    const totalCorrect = players.reduce(
+      (a, p) => a + (p.correctCount || 0), 0
+    );
+
+    const result = new GameResult({
+      quizId: game.quizId_db,
+      hostId: game.hostId_db,
+      totalPlayers: players.length,
+      avgScore: players.length > 0
+        ? Math.round(
+            players.reduce((a, p) => a + p.score, 0) / players.length
+          )
+        : 0,
+      accuracyRate: totalAnswers > 0
+        ? Math.round((totalCorrect / totalAnswers) * 100)
+        : 0,
+      players: players.map(p => ({
+        name: p.name,
+        score: p.score,
+        correctCount: p.correctCount || 0,
+        accuracy: game.questions.length > 0
+          ? Math.round(
+              ((p.correctCount || 0) / game.questions.length) * 100
+            )
+          : 0
+      })),
+      questionStats: game.questionStats.map((s, i) => ({
+        questionIndex: i,
+        correctCount: s.correctCount,
+        avgTime: players.length > 0 
+          ? Math.round(s.totalTime / players.length * 10) / 10
+          : 0
+      }))
+    });
+
+    await result.save();
+    console.log(`Game result saved for PIN ${pin}`);
+  } catch (err) {
+    console.error('Failed to save game result:', err);
+  }
+}
+
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => console.error('❌ DB Error:', err));
+
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/quizzes', require('./routes/quiz'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 io.on('connection', (socket) => {
 
@@ -182,16 +250,22 @@ io.on('connection', (socket) => {
 
     games.set(pin, {
       hostId: socket.id,
+      hostId_db: quizData.hostId_db || null,
+      quizId_db: quizData.quizId_db || null,
       players: new Map(),
       questions: quizData.questions,
       title: quizData.title,
-      settings: quizData.settings,
+      settings: quizData.settings || {},
       currentQuestion: 0,
       state: 'LOBBY',
       timer: null,
       answersReceived: 0,
-      answerCounts: [0, 0, 0, 0],
+      answerCounts: [0,0,0,0],
       questionStartTime: null,
+      questionStats: quizData.questions.map(() => ({ 
+        correctCount: 0, 
+        totalTime: 0 
+      })),
       locked: false
     });
     socket.join(pin);
@@ -293,6 +367,18 @@ io.on('connection', (socket) => {
       player.lastPoints = 0;
       player.lastCorrect = false;
     }
+
+    // Track question stats
+    const qIdx = game.currentQuestion;
+    if (!game.questionStats[qIdx]) {
+      game.questionStats[qIdx] = { correctCount: 0, totalTime: 0 };
+    }
+    if (isCorrect) {
+      game.questionStats[qIdx].correctCount++;
+      if (!player.correctCount) player.correctCount = 0;
+      player.correctCount++;
+    }
+    game.questionStats[qIdx].totalTime += timeTaken;
 
     const allPlayers = Array.from(game.players.values());
     const sorted = allPlayers.sort((a, b) => b.score - a.score);

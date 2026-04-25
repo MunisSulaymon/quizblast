@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - QuizBlast 🎮</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <div class="floating-shapes">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+    <div class="shape shape-3"></div>
+  </div>
+  <div class="auth-card">
+    <h1 class="auth-logo">QuizBlast 🎮</h1>
+    <p class="auth-subtitle">Create your host account</p>
+    
+    <div id="error-msg" class="error-msg hidden"></div>
+    <div id="success-msg" class="success-msg hidden"></div>
+    
+    <div class="input-group">
+      <span class="input-icon">👤</span>
+      <input type="text" id="username" 
+        placeholder="Username (min 3 chars)" 
+        maxlength="20" required>
+    </div>
+    
+    <div class="input-group">
+      <span class="input-icon">📧</span>
+      <input type="email" id="email" 
+        placeholder="Email address" required>
+    </div>
+    
+    <div class="input-group">
+      <span class="input-icon">🔒</span>
+      <input type="password" id="password" 
+        placeholder="Password (min 6 chars)"
+        oninput="checkStrength(this.value)"
+        required>
+      <button type="button" 
+        onclick="togglePassword('password')" 
+        class="show-pass-btn">👁️</button>
+    </div>
+    
+    <div class="strength-container">
+      <div class="strength-bar">
+        <div id="strength-fill" class="strength-fill"></div>
+      </div>
+      <span id="strength-text" class="strength-text"></span>
+    </div>
+    
+    <div class="input-group">
+      <span class="input-icon">🔒</span>
+      <input type="password" id="confirm-password" 
+        placeholder="Confirm password" required>
+    </div>
+    
+    <button onclick="handleRegister()" 
+      id="register-btn" class="btn-auth">
+      CREATE ACCOUNT
+    </button>
+    
+    <p class="auth-footer">
+      Already have an account? 
+      <a href="login.html">Login here</a>
+    </p>
+  </div>
+  <script src="auth.js"></script>
+</body>
+</html>
