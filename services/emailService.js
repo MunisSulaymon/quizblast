@@ -5,8 +5,14 @@ const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
 const sendVerificationEmail = async (email, token, username) => {
   try {
+    console.log('📧 Attempting to send email to:', email);
+    console.log('🔑 RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+    console.log('🌍 APP_URL:', process.env.APP_URL);
+
     const verifyLink = `${APP_URL}/api/auth/verify?token=${token}`;
-    await resend.emails.send({
+    console.log('🔗 Verify link:', verifyLink);
+
+    const result = await resend.emails.send({
       from: 'QuizBlast <onboarding@resend.dev>',
       to: email,
       subject: '🎮 Verify your QuizBlast account',
@@ -33,10 +39,12 @@ const sendVerificationEmail = async (email, token, username) => {
         </html>
       `
     });
+
+    console.log('✅ Email sent result:', JSON.stringify(result));
     return { success: true };
   } catch (err) {
-    console.error('Email send error:', err);
-    return { success: false };
+    console.error('❌ Email send error:', err);
+    return { success: false, error: err };
   }
 };
 
