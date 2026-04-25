@@ -5,6 +5,23 @@ let myScore = 0;
 let hasAnswered = false;
 let questionStartTime = Date.now();
 
+// Initialize mute button
+function initPlayerMute() {
+  const btn = document.getElementById('player-mute-btn');
+  if (btn) {
+    btn.textContent = soundManager.isMuted ? '🔇' : '🔊';
+  }
+}
+
+function togglePlayerMute() {
+  soundManager.unlock();
+  const isMuted = soundManager.toggleMute();
+  const btn = document.getElementById('player-mute-btn');
+  if (btn) btn.textContent = isMuted ? '🔇' : '🔊';
+}
+
+window.addEventListener('load', initPlayerMute);
+
 // DOM Elements
 const screens = ['join-screen', 'waiting-screen', 'question-screen', 'feedback-screen', 'leaderboard-screen', 'podium-screen'];
 
@@ -55,6 +72,7 @@ document.getElementById('join-btn').addEventListener('click', () => {
 socket.on('joinedGame', ({ name, pin }) => {
     myName = name;
     myPin = pin;
+    localStorage.setItem('playerName', name);
     document.getElementById('display-name').innerText = name;
     goToScreen('waiting-screen');
 });
@@ -67,6 +85,8 @@ socket.on('errorMsg', (msg) => {
 
 /* ---- SHOW QUESTION ON DEVICE ---- */
 socket.on('nextQuestion', (data) => {
+  soundManager.unlock();
+  soundManager.playStart();
   const qDisplay = document.getElementById('player-question-display');
   const qText = document.getElementById('player-q-text');
 
@@ -144,6 +164,7 @@ function renderQuizGrid(answers) {
 function submitAnswer(idx) {
     if (hasAnswered) return;
     hasAnswered = true;
+    soundManager.playAnswerLock();
 
     socket.emit('submitAnswer', { 
         pin: myPin, 
@@ -161,6 +182,9 @@ function submitAnswer(idx) {
 }
 
 socket.on('timerTick', (timeLeft) => {
+    if (timeLeft <= 5 && timeLeft > 0) {
+      soundManager.playUrgentTick();
+    }
     document.getElementById('player-timer-num').innerText = timeLeft;
     if (timeLeft === 0) {
         document.querySelectorAll('.btn-answer, .btn-tf').forEach(btn => btn.disabled = true);
@@ -174,10 +198,15 @@ socket.on('answerResult', (data) => {
   const reveal = document.getElementById('correct-ans-reveal');
 
   if (data.correct) {
+    soundManager.playCorrect();
+    if (data.streak >= 3) {
+      setTimeout(() => soundManager.playStreak(), 600);
+    }
     feedbackMain.innerText = "✅ Correct!";
     feedbackFull.className = "feedback-full correct-bg";
     reveal.classList.add('hidden');
   } else {
+    soundManager.playWrong();
     feedbackMain.innerText = "❌ Wrong!";
     feedbackFull.className = "feedback-full wrong-bg";
     reveal.innerText = `The correct answer was: ${data.correctAnswer}`;
@@ -206,6 +235,7 @@ socket.on('answerResult', (data) => {
 });
 
 socket.on('roundResults', ({ leaderboard }) => {
+    soundManager.playResults();
     document.getElementById('player-leaderboard-list').innerHTML = leaderboard.map(p => `
         <div class="lb-item ${p.name === myName ? 'highlight' : ''}">
             <span>#${p.rank} ${p.name}</span>
@@ -228,9 +258,18 @@ socket.on('autoAdvanceDone', () => {
 });
 
 socket.on('podium', ({ winners, allPlayers }) => {
-    const myFinal = allPlayers.find(p => p.name === myName);
-    const myRank = allPlayers.findIndex(p => p.name === myName) + 1;
+    const myNameSaved = localStorage.getItem('playerName') || '';
+    const myFinal = allPlayers.find(p => p.name === myNameSaved);
+    const myRank = allPlayers.findIndex(p => p.name === myNameSaved) + 1;
     
+    if (myRank === 1) {
+      soundManager.playWinner();
+    } else if (myRank <= 3) {
+      soundManager.playStreak();
+    } else {
+      soundManager.playStart();
+    }
+
     document.getElementById('final-rank-msg').innerText = `Your Rank: #${myRank}`;
     document.getElementById('final-score-val').innerText = myFinal ? myFinal.score : myScore;
     

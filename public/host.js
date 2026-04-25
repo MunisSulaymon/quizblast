@@ -125,35 +125,93 @@ function collectSettings() {
   };
 }
 
-/* ---- MUSIC (Howler.js) ---- */
-let bgMusic = null;
-
-function startLobbyMusic(track) {
-  if (bgMusic) bgMusic.stop();
-  if (track === 'off') return;
-
-  const tracks = {
-    classic: 'https://actions.google.com/sounds/v1/science_fiction/techno_suspense.ogg',
-    disco: 'https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg',
-    chill: 'https://actions.google.com/sounds/v1/ambient/meditation_bowl_struck.ogg'
-  };
-
-  bgMusic = new Howl({
-    src: [tracks[track] || tracks.classic],
-    loop: true,
-    volume: 0.4
-  });
-  bgMusic.play();
+/* ---- SOUND SETTINGS ---- */
+function handleMuteToggle(checked) {
+  soundManager.unlock();
+  if (checked) {
+    soundManager.isMuted = true;
+  } else {
+    soundManager.isMuted = false;
+  }
+  soundManager.updateVolumes();
+  soundManager.saveSettings();
 }
 
-function toggleMute() {
-  const btn = document.getElementById('mute-btn');
-  if (bgMusic) {
-    const isMuted = !bgMusic.muted();
-    bgMusic.muted(isMuted);
-    btn.textContent = isMuted ? '🔇' : '🔊';
+function initSoundSettings() {
+  const masterSlider = document.getElementById('master-vol-slider');
+  const musicSlider = document.getElementById('music-vol-slider');
+  const sfxSlider = document.getElementById('sfx-vol-slider');
+  const muteToggle = document.getElementById('mute-all-toggle');
+
+  if (masterSlider) masterSlider.value = soundManager.masterVolume;
+  if (musicSlider) musicSlider.value = soundManager.musicVolume;
+  if (sfxSlider) sfxSlider.value = soundManager.sfxVolume;
+  if (muteToggle) muteToggle.checked = soundManager.isMuted;
+
+  const savedMusic = soundManager.selectedMusic;
+  const radioBtn = document.querySelector(
+    `input[name="bg_music"][value="${savedMusic}"]`
+  );
+  if (radioBtn) radioBtn.checked = true;
+
+  const fileInput = document.getElementById('local-audio-input');
+  const uploadZone = document.getElementById('upload-zone');
+  const statusDiv = document.getElementById('upload-status');
+  const localPreview = document.getElementById('local-preview');
+
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      handleAudioFile(e.target.files[0]);
+    });
+  }
+
+  if (uploadZone) {
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('dragover');
+    });
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      handleAudioFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  function handleAudioFile(file) {
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) {
+      if (statusDiv) {
+        statusDiv.textContent = '❌ Please upload an audio file';
+        statusDiv.style.color = '#FF3355';
+      }
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      if (statusDiv) {
+        statusDiv.textContent = '❌ File too large (max 15MB)';
+        statusDiv.style.color = '#FF3355';
+      }
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    soundManager.setCustomMusic(url);
+
+    if (statusDiv) {
+      statusDiv.textContent = `✅ ${file.name}`;
+      statusDiv.style.color = '#26890C';
+    }
+    if (localPreview) {
+      localPreview.src = url;
+      localPreview.classList.remove('hidden');
+    }
   }
 }
+
+window.addEventListener('load', initSoundSettings);
 
 /* ---- DOUBLE POINTS ANNOUNCEMENT ---- */
 function showDoublePointsAnnouncement() {
@@ -355,11 +413,11 @@ document.getElementById('create-game-btn').addEventListener('click', createGame)
 
 /* ---- SOCKET LISTENERS ---- */
 socket.on('gameCreated', ({ pin }) => {
+  soundManager.unlock();
+  soundManager.playStart();
+  soundManager.startLobbyMusic();
   currentPin = pin;
   document.getElementById('pin-display').textContent = pin;
-  
-  const settings = collectSettings();
-  startLobbyMusic(settings.lobbyMusic);
 
   // Generate QR Code
   document.getElementById('qrcode').innerHTML = '';
@@ -373,6 +431,7 @@ socket.on('gameCreated', ({ pin }) => {
 });
 
 socket.on('playerJoined', ({ players, count }) => {
+  soundManager.playJoin();
   document.getElementById('player-count').innerText = `${count} players joined`;
   document.getElementById('lobby-player-list').innerHTML = players.map(name => `
     <div class="player-tag player-item">${name}</div>
@@ -422,6 +481,10 @@ socket.on('doublePointsWarning', () => {
 });
 
 socket.on('nextQuestion', ({ questionIndex, totalQuestions, question, answers, timeLimit, type, pointsType }) => {
+  soundManager.stopMusic();
+  if (pointsType === 'double') soundManager.playDoublePoints();
+  setTimeout(() => soundManager.startQuestionMusic(), pointsType === 'double' ? 2500 : 0);
+
   currentTimeLimit = timeLimit;
   document.getElementById('q-progress').innerText = `Question ${questionIndex + 1} of ${totalQuestions}`;
   document.getElementById('host-question-text').innerText = question || 'Look at your device!';
@@ -457,6 +520,11 @@ socket.on('nextQuestion', ({ questionIndex, totalQuestions, question, answers, t
 });
 
 socket.on('timerTick', (timeLeft) => {
+  if (timeLeft <= 5 && timeLeft > 0) {
+    soundManager.playUrgentTick();
+  } else if (timeLeft > 0) {
+    soundManager.playTick();
+  }
   document.getElementById('host-timer-num').innerText = timeLeft;
   
   const bar = document.getElementById('timer-bar');
@@ -470,10 +538,13 @@ socket.on('timerTick', (timeLeft) => {
 });
 
 socket.on('playerAnswered', ({ count, total }) => {
+  soundManager.playAnswerLock();
   document.getElementById('p-answered').innerText = `${count} / ${total} Answered`;
 });
 
 socket.on('roundResults', ({ correctIndex, correctAnswer, answerCounts, leaderboard, allPlayers }) => {
+  soundManager.stopMusic();
+  soundManager.playResults();
   document.getElementById('res-correct-text').innerText = correctAnswer;
 
   // Update Bar Chart
@@ -514,6 +585,8 @@ document.getElementById('next-q-btn').addEventListener('click', () => {
 });
 
 socket.on('podium', ({ winners, allPlayers }) => {
+  soundManager.stopMusic();
+  soundManager.playWinner();
   const medals = ['🥇','🥈','🥉'];
   const podiumPlaces = document.getElementById('podium-places');
   if (podiumPlaces) {
@@ -554,6 +627,7 @@ document.getElementById('play-again-btn').addEventListener('click', () => {
 });
 
 socket.on('gameTerminated', (msg) => {
+    soundManager.stopMusic();
     alert(msg);
     window.location.reload();
 });

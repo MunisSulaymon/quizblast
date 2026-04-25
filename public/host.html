@@ -231,20 +231,127 @@
                 </label>
             </div>
 
-            <div class="settings-section-title">🎵 Music</div>
+<!-- SOUND & MUSIC SETTINGS -->
+<div class="settings-section-title">
+  🎵 Sound & Music
+</div>
 
-            <div class="setting-item">
-                <span>Lobby Music</span>
-                <select name="lobbyMusic" class="settings-select">
-                    <option value="classic">🎵 Classic</option>
-                    <option value="disco">🕺 Disco</option>
-                    <option value="chill">😎 Chill</option>
-                    <option value="off">🔇 Off</option>
-                </select>
-            </div>
+<div class="setting-item">
+  <span>Mute All Sounds</span>
+  <label class="switch">
+    <input type="checkbox" id="mute-all-toggle"
+      onchange="handleMuteToggle(this.checked)">
+    <span class="slider round"></span>
+  </label>
+</div>
+
+<div class="setting-item">
+  <span>🔊 Master Volume</span>
+  <input type="range" id="master-vol-slider"
+    min="0" max="1" step="0.1" value="0.5"
+    class="vol-slider"
+    oninput="soundManager.setMasterVolume(this.value)">
+</div>
+
+<div class="setting-item">
+  <span>🎵 Music Volume</span>
+  <input type="range" id="music-vol-slider"
+    min="0" max="1" step="0.1" value="0.7"
+    class="vol-slider"
+    oninput="soundManager.setMusicVolume(this.value)">
+</div>
+
+<div class="setting-item">
+  <span>🎮 SFX Volume</span>
+  <input type="range" id="sfx-vol-slider"
+    min="0" max="1" step="0.1" value="1.0"
+    class="vol-slider"
+    oninput="soundManager.setSFXVolume(this.value)">
+</div>
+
+<div class="settings-section-title">
+  🎼 Background Music
+</div>
+
+<div class="music-options">
+
+  <label class="music-option">
+    <input type="radio" name="bg_music" 
+      value="procedural" checked
+      onchange="soundManager.selectedMusic='procedural';
+        soundManager.saveSettings();">
+    <div class="music-card">
+      <span class="music-icon">🎮</span>
+      <div class="music-info">
+        <span class="music-title">Retro 8-bit</span>
+        <span class="music-mood">Generated music</span>
+      </div>
+      <button type="button" class="preview-btn"
+        onclick="event.stopPropagation();
+          soundManager.unlock();
+          soundManager.previewLobbyMusic()">
+        ▶
+      </button>
+    </div>
+  </label>
+
+  <label class="music-option">
+    <input type="radio" name="bg_music" 
+      value="none"
+      onchange="soundManager.selectedMusic='none';
+        soundManager.saveSettings();
+        soundManager.stopMusic();">
+    <div class="music-card">
+      <span class="music-icon">🔇</span>
+      <div class="music-info">
+        <span class="music-title">No Music</span>
+        <span class="music-mood">Sound effects only</span>
+      </div>
+    </div>
+  </label>
+
+  <label class="music-option">
+    <input type="radio" name="bg_music" 
+      value="custom" id="custom_music_radio"
+      onchange="soundManager.selectedMusic='custom';
+        soundManager.saveSettings();
+        document.getElementById('upload-zone')
+          .classList.remove('hidden');">
+    <div class="music-card">
+      <span class="music-icon">📁</span>
+      <div class="music-info">
+        <span class="music-title">My Music</span>
+        <span class="music-mood">Upload from device</span>
+      </div>
+    </div>
+  </label>
+
+</div>
+
+<!-- Upload Zone -->
+<div id="upload-zone" class="upload-zone hidden">
+  <div class="upload-icon">🎵</div>
+  <p>Drag & drop your music file here</p>
+  <p style="font-size:0.8rem;opacity:0.7;">
+    or
+  </p>
+  <input type="file" id="local-audio-input"
+    accept="audio/*" class="hidden-input">
+  <label for="local-audio-input" class="btn-upload">
+    Browse Files
+  </label>
+  <div id="upload-status" class="upload-status"></div>
+  <audio id="local-preview" controls 
+    class="hidden local-audio-preview"></audio>
+  <p class="upload-note">
+    ⚠️ Music stays in this session only.
+    Re-upload if you refresh the page.
+  </p>
+</div>
         </form>
     </div>
 
+    <script src="soundManager.js"></script>
     <script src="host.js"></script>
 </body>
 
