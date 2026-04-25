@@ -1332,3 +1332,12 @@ input:checked + .slider:before { transform: translateX(24px); }
   .stat-number { font-size: 1.5rem; }
   .auth-card { padding: 1.5rem; margin: 1rem; }
 }
+
+.input-hint {
+  font-size: 0.8rem;
+  margin-top: -8px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+  min-height: 16px;
+  transition: all 0.2s;
+}

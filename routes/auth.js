@@ -16,36 +16,60 @@ const limiter = rateLimit({
 router.post('/register', limiter, async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    if (!username || !email || !password)
-      return res.status(400).json({ msg: 'All fields required' });
-    if (username.length < 3)
-      return res.status(400).json({ msg: 'Username min 3 chars' });
+
+    // Validate username
+    if (!username || typeof username !== 'string') 
+      return res.status(400).json({ msg: 'Username is required' });
+    if (username.length < 3 || username.length > 20)
+      return res.status(400).json({ msg: 'Username must be 3-20 characters' });
+    if (!/^[a-zA-Z0-9_]+$/.test(username))
+      return res.status(400).json({ msg: 'Username: letters, numbers, underscores only' });
+
+    // Validate email
+    if (!email || typeof email !== 'string')
+      return res.status(400).json({ msg: 'Email is required' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return res.status(400).json({ msg: 'Please enter a valid email address' });
+
+    // Validate password
+    if (!password || typeof password !== 'string')
+      return res.status(400).json({ msg: 'Password is required' });
     if (password.length < 6)
-      return res.status(400).json({ msg: 'Password min 6 chars' });
+      return res.status(400).json({ msg: 'Password must be at least 6 characters' });
+    if (password.length > 50)
+      return res.status(400).json({ msg: 'Password is too long' });
 
-    const exists = await User.findOne({ 
-      $or: [{ email }, { username }] 
-    });
-    if (exists) return res.status(400).json({ 
-      msg: 'Email or username already taken' 
-    });
+    // Check duplicates
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) 
+      return res.status(400).json({ msg: 'This email is already registered' });
 
-    const user = new User({ username, email, password });
+    const existingUsername = await User.findOne({ 
+      username: { $regex: new RegExp(`^${username}$`, 'i') } 
+    });
+    if (existingUsername)
+      return res.status(400).json({ msg: 'This username is already taken' });
+
+    const user = new User({ 
+      username, 
+      email: email.toLowerCase(), 
+      password 
+    });
     await user.save();
 
     const token = jwt.sign(
-      { id: user._id }, 
-      process.env.JWT_SECRET, 
+      { id: user._id },
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.cookie('token', token, { 
-      httpOnly: true, 
+    res.cookie('token', token, {
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000
-    }).json({ 
-      success: true, 
-      user: { id: user._id, username, email } 
+    }).json({
+      success: true,
+      user: { id: user._id, username, email }
     });
   } catch (err) {
     console.error(err);

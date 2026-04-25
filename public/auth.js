@@ -51,16 +51,47 @@ async function handleRegister() {
   const confirm = document.getElementById('confirm-password').value;
   const errDiv = document.getElementById('error-msg');
 
-  if (!username || !email || !password || !confirm) {
-    showError(errDiv, 'Please fill in all fields');
+  // USERNAME validation
+  if (!username) {
+    showError(errDiv, 'Username is required');
     return;
   }
-  if (password !== confirm) {
-    showError(errDiv, 'Passwords do not match');
+  if (username.length < 3 || username.length > 20) {
+    showError(errDiv, 'Username must be 3-20 characters');
+    return;
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    showError(errDiv, 'Username can only contain letters, numbers and underscores');
+    return;
+  }
+
+  // EMAIL validation
+  if (!email) {
+    showError(errDiv, 'Email is required');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showError(errDiv, 'Please enter a valid email address');
+    return;
+  }
+
+  // PASSWORD validation
+  if (!password) {
+    showError(errDiv, 'Password is required');
     return;
   }
   if (password.length < 6) {
     showError(errDiv, 'Password must be at least 6 characters');
+    return;
+  }
+  if (password.length > 50) {
+    showError(errDiv, 'Password is too long');
+    return;
+  }
+
+  // CONFIRM PASSWORD
+  if (password !== confirm) {
+    showError(errDiv, 'Passwords do not match');
     return;
   }
 

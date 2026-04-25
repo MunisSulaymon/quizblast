@@ -25,12 +25,14 @@
       <input type="text" id="username" 
         placeholder="Username (min 3 chars)" 
         maxlength="20" required>
+      <div id="username-hint" class="input-hint"></div>
     </div>
     
     <div class="input-group">
       <span class="input-icon">📧</span>
       <input type="email" id="email" 
         placeholder="Email address" required>
+      <div id="email-hint" class="input-hint"></div>
     </div>
     
     <div class="input-group">
@@ -55,6 +57,7 @@
       <span class="input-icon">🔒</span>
       <input type="password" id="confirm-password" 
         placeholder="Confirm password" required>
+      <div id="confirm-hint" class="input-hint"></div>
     </div>
     
     <button onclick="handleRegister()" 
@@ -67,6 +70,66 @@
       <a href="login.html">Login here</a>
     </p>
   </div>
+  <script>
+  // Live username validation
+  document.getElementById('username').addEventListener('input', function() {
+    const val = this.value.trim();
+    const hint = document.getElementById('username-hint');
+    if (val.length === 0) {
+      hint.textContent = '';
+      this.style.borderColor = '';
+    } else if (val.length < 3) {
+      hint.textContent = '❌ Too short (min 3 chars)';
+      hint.style.color = '#FF3355';
+      this.style.borderColor = '#FF3355';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(val)) {
+      hint.textContent = '❌ Only letters, numbers, underscores';
+      hint.style.color = '#FF3355';
+      this.style.borderColor = '#FF3355';
+    } else {
+      hint.textContent = '✅ Username looks good!';
+      hint.style.color = '#26890C';
+      this.style.borderColor = '#26890C';
+    }
+  });
+
+  // Live email validation
+  document.getElementById('email').addEventListener('input', function() {
+    const val = this.value.trim();
+    const hint = document.getElementById('email-hint');
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    if (val.length === 0) {
+      hint.textContent = '';
+      this.style.borderColor = '';
+    } else if (!valid) {
+      hint.textContent = '❌ Enter a valid email (e.g. name@email.com)';
+      hint.style.color = '#FF3355';
+      this.style.borderColor = '#FF3355';
+    } else {
+      hint.textContent = '✅ Email looks good!';
+      hint.style.color = '#26890C';
+      this.style.borderColor = '#26890C';
+    }
+  });
+
+  // Live password match validation
+  document.getElementById('confirm-password').addEventListener('input', function() {
+    const pass = document.getElementById('password').value;
+    const hint = document.getElementById('confirm-hint');
+    if (this.value.length === 0) {
+      hint.textContent = '';
+      this.style.borderColor = '';
+    } else if (this.value !== pass) {
+      hint.textContent = '❌ Passwords do not match';
+      hint.style.color = '#FF3355';
+      this.style.borderColor = '#FF3355';
+    } else {
+      hint.textContent = '✅ Passwords match!';
+      hint.style.color = '#26890C';
+      this.style.borderColor = '#26890C';
+    }
+  });
+  </script>
   <script src="auth.js"></script>
 </body>
 </html>
