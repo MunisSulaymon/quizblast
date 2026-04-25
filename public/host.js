@@ -304,6 +304,7 @@ async function createGame() {
       
       // Save quiz to database if logged in
       if (!savedQuizId) {
+        // Save NEW quiz
         const saveRes = await fetch('/api/quizzes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -318,6 +319,21 @@ async function createGame() {
           quizId_db = saved._id;
           savedQuizId = saved._id;
           showNotification('Quiz saved! ✓');
+        }
+      } else {
+        // UPDATE existing quiz
+        const updateRes = await fetch(`/api/quizzes/${savedQuizId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            questions: globalQuestionsArray,
+            settings: collectSettings()
+          })
+        });
+        if (updateRes.ok) {
+          quizId_db = savedQuizId;
+          showNotification('Quiz updated! ✓');
         }
       }
     }

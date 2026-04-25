@@ -51,8 +51,10 @@ function shuffleAnswers(question) {
 }
 
 /* ---- UPDATE calculateScore ---- */
-function calculateScore(timeTaken, totalTime, isCorrect, pointsType) {
-  if (!isCorrect || pointsType === 'none') return 0;
+function calculateScore(timeTaken, totalTime, isCorrect, pointsType, questionType) {
+  if (!isCorrect) return 0;
+  if (pointsType === 'none') return 0;
+  if (questionType === 'poll') return 0;
   const base = Math.round(1000 * (1 - ((timeTaken / totalTime) / 2)));
   if (pointsType === 'double') return base * 2;
   return base;
@@ -185,8 +187,17 @@ async function advanceGame(pin) {
 async function saveGameResult(pin) {
   const game = games.get(pin);
   if (!game || !game.hostId_db) return;
+  if (!game.quizId_db) return; // ADD THIS CHECK
   
   try {
+    // Check quiz still exists
+    const Quiz = require('./models/Quiz');
+    const quizExists = await Quiz.findById(game.quizId_db);
+    if (!quizExists) {
+      console.log('Quiz was deleted, skipping result save');
+      return;
+    }
+    
     const players = Array.from(game.players.values());
     const totalAnswers = players.length * game.questions.length;
     const totalCorrect = players.reduce(
@@ -225,7 +236,7 @@ async function saveGameResult(pin) {
     });
 
     await result.save();
-    console.log(`Game result saved for PIN ${pin}`);
+    console.log(`✅ Game result saved for PIN ${pin}`);
   } catch (err) {
     console.error('Failed to save game result:', err);
   }
@@ -357,7 +368,13 @@ io.on('connection', (socket) => {
       player.streak++;
       const multiplier = getMultiplier(player.streak);
       const points = Math.round(
-        calculateScore(timeTaken, qSettings.timeLimit || 20, true, qSettings.pointsType || 'standard') * multiplier
+        calculateScore(
+          timeTaken, 
+          qSettings.timeLimit || 20, 
+          isCorrect, 
+          qSettings.pointsType || 'standard',
+          qSettings.questionType || 'quiz'
+        ) * multiplier
       );
       player.score += points;
       player.lastPoints = points;
