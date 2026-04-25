@@ -27,7 +27,10 @@
             <p class="subtitle">The ultimate real-time quiz game!</p>
 
             <div class="home-buttons">
-                <a href="host.html" style="text-decoration: none;">
+                <a href="login.html" class="btn-login-home">
+                    🔐 Host Login / Register
+                </a>
+                <a href="#" onclick="checkAuthAndHost()" style="text-decoration: none;">
                     <button class="btn-host">🎯 Host a Game</button>
                 </a>
                 <a href="join.html" style="text-decoration: none;">
@@ -40,6 +43,21 @@
     <footer style="position: fixed; bottom: 1rem; width: 100%; text-align: center; opacity: 0.6;">
         Built with ❤️ using Socket.io
     </footer>
+
+    <script>
+        async function checkAuthAndHost() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    window.location.href = 'host.html';
+                } else {
+                    window.location.href = 'login.html';
+                }
+            } catch (e) {
+                window.location.href = 'login.html';
+            }
+        }
+    </script>
 </body>
 
 </html>
