@@ -18,6 +18,7 @@ const io = new Server(httpServer, {
 app.use(helmet({ 
   contentSecurityPolicy: false 
 }));
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
