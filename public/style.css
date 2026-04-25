@@ -1341,3 +1341,41 @@ input:checked + .slider:before { transform: translateX(24px); }
   min-height: 16px;
   transition: all 0.2s;
 }
+
+/* Email bounce animation */
+.email-bounce {
+  font-size: 5rem;
+  display: block;
+  animation: bounce 2s infinite;
+  margin-bottom: 1rem;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+/* Success checkmark animation */
+.success-checkmark {
+  font-size: 5rem;
+  display: block;
+  animation: popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+  margin-bottom: 1rem;
+}
+@keyframes popIn {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Success message */
+.success-msg {
+  background: rgba(38,137,12,0.2);
+  border: 1px solid #26890C;
+  color: #26890C;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+}

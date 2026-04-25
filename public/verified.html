@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verified! - QuizBlast 🎮</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <div class="floating-shapes">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+    <div class="shape shape-3"></div>
+  </div>
+  <div class="auth-card" style="text-align:center;">
+    <div class="success-checkmark">✅</div>
+    <h1 class="auth-logo" style="font-size:1.6rem;color:#26890C;">
+      Email Verified!
+    </h1>
+    <p class="auth-subtitle">
+      Welcome to QuizBlast! Your account is ready.
+    </p>
+    <p style="color:rgba(255,255,255,0.6);font-size:0.9rem;">
+      Redirecting to your dashboard in 
+      <span id="countdown" 
+        style="color:#FFD700;font-weight:700;
+        font-size:1.1rem;">3</span> seconds...
+    </p>
+    <div style="margin-top:1.5rem;">
+      <a href="dashboard.html" class="btn-auth"
+        style="text-decoration:none;display:block;">
+        Go to Dashboard Now →
+      </a>
+    </div>
+  </div>
+  <script>
+    let count = 3;
+    const interval = setInterval(() => {
+      count--;
+      document.getElementById('countdown')
+        .textContent = count;
+      if (count <= 0) {
+        clearInterval(interval);
+        window.location.href = '/dashboard.html';
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
