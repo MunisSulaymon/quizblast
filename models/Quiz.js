@@ -10,6 +10,7 @@ const quizSchema = new mongoose.Schema({
     question: String,
     answers: [String],
     correctIndex: Number,
+    acceptedAnswers: [String],
     settings: {
       timeLimit: { type: Number, default: 20 },
       pointsType: { 
@@ -19,9 +20,11 @@ const quizSchema = new mongoose.Schema({
       },
       questionType: { 
         type: String, 
-        enum: ['quiz','true-false','poll'], 
+        enum: ['quiz','true-false','poll','type-answer'], 
         default: 'quiz' 
-      }
+      },
+      allowFuzzy: { type: Boolean, default: true },
+      fuzzyTolerance: { type: Number, default: 2 }
     }
   }],
   settings: {

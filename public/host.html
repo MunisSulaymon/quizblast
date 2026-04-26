@@ -113,6 +113,7 @@
             </div>
         </div>
         <div id="streak-display" class="hidden"></div>
+        <div id="host-activity-feed" class="activity-feed"></div>
     </div>
 
     <div id="results-screen" class="screen">
@@ -138,6 +139,11 @@
                 <div id="bar-3" class="bar green"></div>
                 <div style="font-weight: 700;">D</div>
             </div>
+        </div>
+
+        <div id="type-answer-section" class="hidden">
+          <h3>📝 Player Answers</h3>
+          <div id="answers-word-display" class="word-display"></div>
         </div>
 
         <h2 style="margin-top: 3rem;">Leaderboard</h2>
@@ -230,6 +236,30 @@
                     <span class="slider round"></span>
                 </label>
             </div>
+
+<div class="settings-section-title">
+  ⚡ Power-ups
+</div>
+
+<div class="setting-item">
+  <span>Enable Power-ups</span>
+  <label class="switch">
+    <input type="checkbox" name="powerUpsEnabled" id="powerups-toggle">
+    <span class="slider round"></span>
+  </label>
+</div>
+
+<div id="powerup-info" class="powerup-info-box hidden">
+  <p>Players earn power-ups every 3 correct answers:</p>
+  <div class="powerup-list">
+    <span>📈 2X Points</span>
+    <span>🛡️ Shield</span>
+    <span>🔥 Streak Guard</span>
+    <span>✂️ 50/50</span>
+    <span>❄️ Freeze</span>
+    <span>💡 Hint</span>
+  </div>
+</div>
 
 <!-- SOUND & MUSIC SETTINGS -->
 <div class="settings-section-title">

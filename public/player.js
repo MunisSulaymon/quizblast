@@ -4,6 +4,8 @@ let myPin = '';
 let myScore = 0;
 let hasAnswered = false;
 let questionStartTime = Date.now();
+let playerPowerups = [];
+let isFrozen = false;
 
 // Initialize mute button
 function initPlayerMute() {
@@ -120,6 +122,34 @@ socket.on('nextQuestion', (data) => {
   // Reset Timer Bar
   hasAnswered = false;
   questionStartTime = Date.now();
+  isFrozen = false;
+  playerPowerups = [];
+
+  const typeInput = document.getElementById('type-answer-input');
+  const answersContainer = document.getElementById('answers-container');
+  const textInput = document.getElementById('player-text-input');
+  const hintDisplay = document.getElementById('hint-display');
+  const powerupBar = document.getElementById('powerup-bar');
+
+  // Reset type answer UI
+  if (textInput) {
+    textInput.value = '';
+    textInput.disabled = false;
+  }
+  if (hintDisplay) hintDisplay.classList.add('hidden');
+
+  // Show correct input type
+  if (data.type === 'type-answer') {
+    if (typeInput) typeInput.classList.remove('hidden');
+    if (answersContainer) answersContainer.classList.add('hidden');
+  } else {
+    if (typeInput) typeInput.classList.add('hidden');
+    if (answersContainer) answersContainer.classList.remove('hidden');
+  }
+
+  // Hide powerup bar if no powerups
+  updatePowerupBar();
+
   const timerBar = document.getElementById('player-timer-bar');
   timerBar.style.width = '100%';
   timerBar.style.transition = 'none';
@@ -161,8 +191,52 @@ function renderQuizGrid(answers) {
   `;
 }
 
+const textInput = document.getElementById('player-text-input');
+const charCount = document.getElementById('char-count');
+const submitTextBtn = document.getElementById('submit-text-btn');
+
+if (textInput) {
+  textInput.addEventListener('input', () => {
+    if (charCount) charCount.textContent = textInput.value.length;
+  });
+  textInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !hasAnswered) {
+      submitTypeAnswer();
+    }
+  });
+}
+
+if (submitTextBtn) {
+  submitTextBtn.addEventListener('click', submitTypeAnswer);
+}
+
+function submitTypeAnswer() {
+  if (hasAnswered || isFrozen) return;
+  const text = document.getElementById('player-text-input')
+    ?.value.trim();
+  if (!text) return;
+
+  hasAnswered = true;
+  soundManager.playAnswerLock();
+
+  const input = document.getElementById('player-text-input');
+  const btn = document.getElementById('submit-text-btn');
+  if (input) input.disabled = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '✓ Submitted!';
+  }
+
+  const timeTaken = (Date.now() - questionStartTime) / 1000;
+  socket.emit('submitAnswer', {
+    pin: myPin,
+    answerText: text,
+    timeTaken
+  });
+}
+
 function submitAnswer(idx) {
-    if (hasAnswered) return;
+    if (hasAnswered || isFrozen) return;
     hasAnswered = true;
     soundManager.playAnswerLock();
 
@@ -203,6 +277,9 @@ socket.on('answerResult', (data) => {
       setTimeout(() => soundManager.playStreak(), 600);
     }
     feedbackMain.innerText = "✅ Correct!";
+    if (data.matchType === 'fuzzy') {
+      feedbackMain.innerText = '✅ Close enough! (fuzzy match)';
+    }
     feedbackFull.className = "feedback-full correct-bg";
     reveal.classList.add('hidden');
   } else {
@@ -302,3 +379,129 @@ socket.on('roomLockStatus', (locked) => {
         console.log("Room is now unlocked.");
     }
 });
+
+socket.on('powerUpEarned', ({ powerup, message }) => {
+  playerPowerups.push(powerup);
+  showPowerupToast(`🎁 Earned: ${message}`);
+  updatePowerupBar();
+});
+
+socket.on('powerUpEffect', (data) => {
+  switch(data.type) {
+    case 'frozen':
+      activateFreeze(data.duration || 3000);
+      break;
+    case 'doublePoints':
+    case 'streakProtect':
+    case 'shield':
+    case 'freezeSent':
+    case 'freezeFailed':
+      showPowerupToast(data.message);
+      break;
+    case 'fiftyfifty':
+      applyFiftyFifty(data.removeIndexes);
+      break;
+    case 'hint':
+      showHint(data.hint);
+      break;
+  }
+});
+
+function updatePowerupBar() {
+  const bar = document.getElementById('powerup-bar');
+  const slots = document.getElementById('powerup-slots');
+  if (!bar || !slots) return;
+
+  if (playerPowerups.length === 0) {
+    bar.classList.add('hidden');
+    return;
+  }
+
+  bar.classList.remove('hidden');
+  const icons = {
+    doublePoints: '📈',
+    shield: '🛡️',
+    streakProtect: '🔥',
+    hint: '💡',
+    freeze: '❄️',
+    fiftyfifty: '✂️'
+  };
+
+  slots.innerHTML = playerPowerups.map((p, i) => `
+    <button class="powerup-slot" 
+      onclick="activatePowerup('${p}', ${i})"
+      title="${getPowerUpDisplayName(p)}">
+      ${icons[p] || '⚡'}
+    </button>
+  `).join('');
+}
+
+function getPowerUpDisplayName(type) {
+  const names = {
+    doublePoints: '2X Points',
+    shield: 'Shield',
+    streakProtect: 'Streak Guard',
+    hint: 'Hint',
+    freeze: 'Freeze',
+    fiftyfifty: '50/50'
+  };
+  return names[type] || type;
+}
+
+function activatePowerup(type, index) {
+  if (hasAnswered && type !== 'freeze') return;
+  socket.emit('usePowerUp', { 
+    pin: myPin, 
+    powerupType: type 
+  });
+  playerPowerups.splice(index, 1);
+  updatePowerupBar();
+}
+
+function activateFreeze(duration) {
+  isFrozen = true;
+  soundManager.playWrong();
+  const overlay = document.getElementById('freeze-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+
+  let count = Math.ceil(duration / 1000);
+  const countEl = document.getElementById('freeze-countdown');
+  if (countEl) countEl.textContent = count;
+
+  const interval = setInterval(() => {
+    count--;
+    if (countEl) countEl.textContent = count;
+    if (count <= 0) {
+      clearInterval(interval);
+      isFrozen = false;
+      if (overlay) overlay.classList.add('hidden');
+    }
+  }, 1000);
+}
+
+function applyFiftyFifty(removeIndexes) {
+  removeIndexes.forEach(idx => {
+    const btns = document.querySelectorAll('.btn-answer');
+    if (btns[idx]) {
+      btns[idx].style.opacity = '0.2';
+      btns[idx].disabled = true;
+    }
+  });
+  showPowerupToast('50/50 applied! ✂️');
+}
+
+function showHint(letter) {
+  const hintDisplay = document.getElementById('hint-display');
+  if (hintDisplay) {
+    hintDisplay.textContent = `💡 Hint: Starts with "${letter}"`;
+    hintDisplay.classList.remove('hidden');
+  }
+}
+
+function showPowerupToast(message) {
+  const toast = document.getElementById('powerup-toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.remove('hidden');
+  setTimeout(() => toast.classList.add('hidden'), 3000);
+}

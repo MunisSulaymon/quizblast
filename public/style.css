@@ -1539,3 +1539,300 @@ input:checked + .slider:before { transform: translateX(24px); }
   .vol-slider { width: 90px; }
   .music-title { font-size: 0.85rem; }
 }
+
+/* ===== TYPE ANSWER ===== */
+.type-answer-field {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.2rem;
+  font-family: 'Montserrat', sans-serif;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  text-align: center;
+  outline: none;
+  transition: border 0.2s;
+  box-sizing: border-box;
+}
+.type-answer-field::placeholder {
+  color: rgba(255,255,255,0.5);
+}
+.type-answer-field:focus {
+  border-color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.2);
+}
+.type-answer-field:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.char-count {
+  text-align: right;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.8rem;
+  margin: 4px 0 12px;
+}
+.btn-submit-text {
+  width: 100%;
+  padding: 16px;
+  background: #26890C;
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Montserrat', sans-serif;
+}
+.btn-submit-text:hover {
+  background: #2ea80f;
+  transform: scale(1.02);
+}
+.btn-submit-text:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+.hint-display {
+  background: rgba(255,215,0,0.2);
+  border: 1px solid #FFD700;
+  color: #FFD700;
+  padding: 10px 16px;
+  border-radius: 10px;
+  margin-top: 10px;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* ===== TYPE ANSWER BUILDER ===== */
+.ta-answers {
+  padding: 12px;
+  background: rgba(70,23,143,0.05);
+  border-radius: 12px;
+  border: 2px dashed #46178F;
+  margin-top: 8px;
+}
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-height: 36px;
+}
+.answer-tag {
+  background: #46178F;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.answer-tag button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  line-height: 1;
+}
+.ta-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+.ta-input:focus {
+  border-color: #46178F;
+  outline: none;
+}
+.fuzzy-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #555;
+  cursor: pointer;
+}
+
+/* ===== POWER-UPS ===== */
+.powerup-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 50px;
+  margin: 10px auto;
+  width: fit-content;
+  max-width: 90%;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.powerup-bar-label {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.powerup-slots {
+  display: flex;
+  gap: 8px;
+}
+.powerup-slot {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.15);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+.powerup-slot:hover {
+  transform: scale(1.15);
+  background: rgba(255,255,255,0.25);
+  border-color: white;
+}
+.powerup-slot:active {
+  transform: scale(0.95);
+}
+
+/* Power-up Toast */
+.powerup-toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(70,23,143,0.95);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 700;
+  z-index: 9999;
+  border: 2px solid rgba(255,255,255,0.3);
+  backdrop-filter: blur(10px);
+  animation: slideDown 0.3s ease;
+  white-space: nowrap;
+}
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* Freeze Overlay */
+.freeze-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 150, 255, 0.3);
+  backdrop-filter: blur(8px);
+  z-index: 9000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.freeze-content {
+  text-align: center;
+  color: white;
+}
+.freeze-icon {
+  font-size: 5rem;
+  animation: shake 0.5s infinite;
+}
+@keyframes shake {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+.freeze-content h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2.5rem;
+  color: #00BFFF;
+  text-shadow: 0 0 20px #00BFFF;
+  margin: 10px 0;
+}
+.freeze-countdown {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 4rem;
+  color: white;
+  font-weight: 700;
+}
+
+/* Power-up info box */
+.powerup-info-box {
+  background: rgba(70,23,143,0.1);
+  border: 1px solid #46178F;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #333;
+}
+.powerup-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.powerup-list span {
+  background: rgba(70,23,143,0.1);
+  border: 1px solid #46178F;
+  border-radius: 50px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+/* Host Activity Feed */
+.activity-feed {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 260px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.activity-item {
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  animation: fadeIn 0.3s ease;
+  border-left: 3px solid #46178F;
+}
+
+/* Word Display */
+.word-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px;
+}
+.word-tag {
+  background: #46178F;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Mobile power-ups */
+@media (max-width: 480px) {
+  .powerup-slot { width: 44px; height: 44px; font-size: 1.3rem; }
+  .powerup-toast { font-size: 0.9rem; padding: 10px 18px; }
+  .freeze-content h2 { font-size: 2rem; }
+}

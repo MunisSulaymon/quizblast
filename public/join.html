@@ -14,6 +14,16 @@
 </head>
 
 <body>
+    <div id="freeze-overlay" class="freeze-overlay hidden">
+      <div class="freeze-content">
+        <div class="freeze-icon">❄️</div>
+        <h2>FROZEN!</h2>
+        <p>You've been frozen!</p>
+        <div id="freeze-countdown" class="freeze-countdown">3</div>
+      </div>
+    </div>
+
+    <div id="powerup-toast" class="powerup-toast hidden"></div>
     <button id="player-mute-btn" 
       class="player-mute-btn"
       onclick="togglePlayerMute()"
@@ -61,6 +71,27 @@
 
         <div id="streak-display" class="hidden" style="margin-bottom: 1rem;"></div>
         <div id="auto-advance-bar" class="auto-advance-bar hidden"></div>
+
+        <div id="powerup-bar" class="powerup-bar hidden">
+          <div class="powerup-bar-label">⚡ Power-ups</div>
+          <div id="powerup-slots" class="powerup-slots"></div>
+        </div>
+
+        <div id="type-answer-input" class="hidden">
+          <input type="text" 
+            id="player-text-input"
+            maxlength="50"
+            placeholder="Type your answer..."
+            class="type-answer-field"
+            autocomplete="off">
+          <div class="char-count">
+            <span id="char-count">0</span>/50
+          </div>
+          <button id="submit-text-btn" class="btn-submit-text">
+            ✓ Submit Answer
+          </button>
+          <div id="hint-display" class="hint-display hidden"></div>
+        </div>
 
         <div id="answers-container">
             <div class="game-grid">

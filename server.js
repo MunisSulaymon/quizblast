@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const GameResult = require('./models/GameResult');
+const { validateTypeAnswer } = require('./utils/levenshtein');
 
 const app = express();
 const httpServer = createServer(app);
@@ -81,6 +82,7 @@ function startQuestion(pin) {
   game.questionStartTime = Date.now();
   game.answersReceived = 0;
   game.answerCounts = [0, 0, 0, 0];
+  game.typedAnswers = [];
   game.state = 'QUESTION';
 
   const payload = {
@@ -141,6 +143,8 @@ function endRound(pin) {
     correctIndex: q.correctIndex,
     correctAnswer: q.answers[q.correctIndex],
     answerCounts: game.answerCounts,
+    typedAnswers: game.typedAnswers || [],
+    questionType: q.settings?.questionType || 'quiz',
     leaderboard: players.slice(0,5).map((p,i) => ({
       rank: i+1, name: p.name, score: p.score
     })),
@@ -251,6 +255,18 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/quizzes', require('./routes/quiz'));
 app.use('/api/analytics', require('./routes/analytics'));
 
+function getPowerUpName(type) {
+  const names = {
+    doublePoints: '2X Points 📈',
+    shield: 'Shield 🛡️',
+    streakProtect: 'Streak Guard 🔥',
+    hint: 'Hint 💡',
+    freeze: 'Freeze ❄️',
+    fiftyfifty: '50/50 ✂️'
+  };
+  return names[type] || type;
+}
+
 io.on('connection', (socket) => {
 
   // HOST: Create game
@@ -267,7 +283,10 @@ io.on('connection', (socket) => {
       players: new Map(),
       questions: quizData.questions,
       title: quizData.title,
-      settings: quizData.settings || {},
+      settings: {
+        ...(quizData.settings || {}),
+        powerUpsEnabled: quizData.settings?.powerUpsEnabled || false
+      },
       currentQuestion: 0,
       state: 'LOBBY',
       timer: null,
@@ -347,7 +366,7 @@ io.on('connection', (socket) => {
   });
 
   // PLAYER: Submit answer
-  socket.on('submitAnswer', ({ pin, answerIndex }) => {
+  socket.on('submitAnswer', ({ pin, answerIndex, answerText, timeTaken }) => {
     const game = games.get(pin);
     if (!game || game.state !== 'QUESTION') return;
 
@@ -357,56 +376,151 @@ io.on('connection', (socket) => {
     player.answered = true;
     game.answersReceived++;
 
-    const timeTaken = (Date.now() - game.questionStartTime) / 1000;
     const question = game.questions[game.currentQuestion];
-    const isCorrect = answerIndex === question.correctIndex;
+    const qType = question.settings?.questionType || 'quiz';
     const qSettings = question.settings || {};
+    let isCorrect = false;
+    let matchType = 'none';
+    let correctAnswer = '';
 
-    if (!game.answerCounts) game.answerCounts = [0, 0, 0, 0];
-    game.answerCounts[answerIndex]++;
-
-    if (isCorrect) {
-      player.streak++;
-      const multiplier = getMultiplier(player.streak);
-      const points = Math.round(
-        calculateScore(
-          timeTaken, 
-          qSettings.timeLimit || 20, 
-          isCorrect, 
-          qSettings.pointsType || 'standard',
-          qSettings.questionType || 'quiz'
-        ) * multiplier
+    if (qType === 'type-answer') {
+      // Type answer validation
+      const acceptedAnswers = question.acceptedAnswers || 
+        [question.answers[question.correctIndex]];
+      const result = validateTypeAnswer(
+        answerText || '',
+        acceptedAnswers,
+        qSettings.allowFuzzy !== false,
+        qSettings.fuzzyTolerance || 2
       );
-      player.score += points;
-      player.lastPoints = points;
-      player.lastCorrect = true;
+      isCorrect = result.isCorrect;
+      matchType = result.matchType;
+      correctAnswer = acceptedAnswers[0];
+
+      // Track typed answers for word cloud
+      if (!game.typedAnswers) game.typedAnswers = [];
+      game.typedAnswers.push(answerText || '');
     } else {
-      player.streak = 0;
-      player.lastPoints = 0;
-      player.lastCorrect = false;
+      // Multiple choice validation
+      isCorrect = answerIndex === question.correctIndex;
+      matchType = isCorrect ? 'exact' : 'none';
+      correctAnswer = question.answers[question.correctIndex];
+      
+      if (!game.answerCounts) game.answerCounts = [0,0,0,0];
+      if (answerIndex >= 0 && answerIndex < 4) {
+        game.answerCounts[answerIndex]++;
+      }
     }
 
-    // Track question stats
-    const qIdx = game.currentQuestion;
-    if (!game.questionStats[qIdx]) {
-      game.questionStats[qIdx] = { correctCount: 0, totalTime: 0 };
-    }
+    // Calculate base score
+    const tl = qSettings.timeLimit || 20;
+    const timeTakenSec = timeTaken || 
+      (Date.now() - game.questionStartTime) / 1000;
+    let points = 0;
+
     if (isCorrect) {
-      game.questionStats[qIdx].correctCount++;
+      const basePoints = Math.round(
+        1000 * (1 - ((timeTakenSec / tl) / 2))
+      );
+      const fuzzyMultiplier = matchType === 'fuzzy' ? 0.75 : 1.0;
+      let pointsType = qSettings.pointsType || 'standard';
+
+      // Check double points power-up
+      if (player.activeEffects?.includes('doublePoints')) {
+        pointsType = 'double';
+        player.activeEffects = player.activeEffects.filter(
+          e => e !== 'doublePoints'
+        );
+      }
+
+      const typeMultiplier = pointsType === 'double' ? 2 
+        : pointsType === 'none' ? 0 : 1;
+
+      // Streak multiplier
+      player.streak = (player.streak || 0) + 1;
+      const streakMult = player.streak >= 10 ? 1.5
+        : player.streak >= 5 ? 1.2
+        : player.streak >= 3 ? 1.1 : 1.0;
+
+      points = Math.round(
+        basePoints * fuzzyMultiplier * typeMultiplier * streakMult
+      );
+
+      // Track correct for question stats
+      if (!game.questionStats) {
+        game.questionStats = game.questions.map(() => ({ 
+          correctCount: 0, totalTime: 0 
+        }));
+      }
+      game.questionStats[game.currentQuestion].correctCount++;
       if (!player.correctCount) player.correctCount = 0;
       player.correctCount++;
-    }
-    game.questionStats[qIdx].totalTime += timeTaken;
 
-    const allPlayers = Array.from(game.players.values());
-    const sorted = allPlayers.sort((a, b) => b.score - a.score);
-    const rank = sorted.findIndex(p => p.name === player.name) + 1;
+      // Check if earned power-up (every 3 streak)
+      if (game.settings?.powerUpsEnabled && 
+          player.streak > 0 && player.streak % 3 === 0) {
+        const powerups = [
+          'doublePoints','shield','streakProtect',
+          'hint','freeze','fiftyfifty'
+        ];
+        // Bottom half players get better powerups
+        const allPlayers = Array.from(game.players.values())
+          .sort((a,b) => b.score - a.score);
+        const rank = allPlayers.findIndex(
+          p => p.name === player.name
+        ) + 1;
+        const isBottomHalf = rank > allPlayers.length / 2;
+
+        let availablePowerups = isBottomHalf 
+          ? ['doublePoints','freeze','fiftyfifty','hint']
+          : ['shield','streakProtect','doublePoints'];
+
+        const randomPowerup = availablePowerups[
+          Math.floor(Math.random() * availablePowerups.length)
+        ];
+
+        if (!player.powerups) player.powerups = [];
+        if (player.powerups.length < 2) {
+          player.powerups.push(randomPowerup);
+          socket.emit('powerUpEarned', { 
+            powerup: randomPowerup,
+            message: getPowerUpName(randomPowerup)
+          });
+        }
+      }
+    } else {
+      // Wrong answer
+      if (player.activeEffects?.includes('streakProtect')) {
+        player.activeEffects = player.activeEffects.filter(
+          e => e !== 'streakProtect'
+        );
+      } else {
+        player.streak = 0;
+      }
+    }
+
+    if (game.questionStats) {
+      game.questionStats[game.currentQuestion].totalTime += 
+        timeTakenSec;
+    }
+
+    player.score = (player.score || 0) + points;
+    player.lastPoints = points;
+    player.lastCorrect = isCorrect;
+
+    // Get player rank
+    const allPlayers = Array.from(game.players.values())
+      .sort((a,b) => b.score - a.score);
+    const rank = allPlayers.findIndex(
+      p => p.name === player.name
+    ) + 1;
 
     socket.emit('answerResult', {
       correct: isCorrect,
+      matchType,
       correctIndex: question.correctIndex,
-      correctAnswer: question.answers[question.correctIndex],
-      points: player.lastPoints,
+      correctAnswer,
+      points,
       totalScore: player.score,
       streak: player.streak,
       rank,
@@ -418,6 +532,127 @@ io.on('connection', (socket) => {
       total: game.players.size
     });
   });
+
+  socket.on('usePowerUp', ({ pin, powerupType, targetId }) => {
+    const game = games.get(pin);
+    if (!game || game.state !== 'QUESTION') return;
+
+    const player = game.players.get(socket.id);
+    if (!player || !player.powerups) return;
+
+    const index = player.powerups.indexOf(powerupType);
+    if (index === -1) return;
+
+    // Remove from inventory
+    player.powerups.splice(index, 1);
+
+    const question = game.questions[game.currentQuestion];
+
+    switch(powerupType) {
+      case 'doublePoints':
+        if (!player.activeEffects) player.activeEffects = [];
+        player.activeEffects.push('doublePoints');
+        socket.emit('powerUpEffect', { 
+          type: 'doublePoints',
+          message: '2X Points activated! 📈'
+        });
+        break;
+
+      case 'streakProtect':
+        if (!player.activeEffects) player.activeEffects = [];
+        player.activeEffects.push('streakProtect');
+        socket.emit('powerUpEffect', {
+          type: 'streakProtect',
+          message: 'Streak protected! 🔥'
+        });
+        break;
+
+      case 'shield':
+        if (!player.activeEffects) player.activeEffects = [];
+        player.activeEffects.push('shielded');
+        socket.emit('powerUpEffect', {
+          type: 'shield',
+          message: 'Shield activated! 🛡️'
+        });
+        break;
+
+      case 'fiftyfifty':
+        if (question.settings?.questionType === 'quiz') {
+          const correctIdx = question.correctIndex;
+          const wrongIndexes = [0,1,2,3]
+            .filter(i => i !== correctIdx);
+          const toRemove = wrongIndexes
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 2);
+          socket.emit('powerUpEffect', {
+            type: 'fiftyfifty',
+            removeIndexes: toRemove,
+            message: '50/50 used! ✂️'
+          });
+        }
+        break;
+
+      case 'hint':
+        if (question.settings?.questionType === 'type-answer') {
+          const ans = (question.acceptedAnswers || [])[0] || 
+            question.answers[question.correctIndex] || '';
+          socket.emit('powerUpEffect', {
+            type: 'hint',
+            hint: ans.charAt(0).toUpperCase(),
+            message: `Hint: Starts with "${ans.charAt(0).toUpperCase()}" 💡`
+          });
+        }
+        break;
+
+      case 'freeze':
+        // Find target (random player ahead of them)
+        const allPlayers = Array.from(game.players.entries())
+          .sort(([,a],[,b]) => b.score - a.score);
+        const myRank = allPlayers.findIndex(
+          ([id]) => id === socket.id
+        );
+        const targets = allPlayers
+          .slice(0, myRank)
+          .filter(([id]) => {
+            const p = game.players.get(id);
+            return !p?.activeEffects?.includes('shielded') && 
+                   !p?.answered;
+          });
+
+        if (targets.length > 0) {
+          const [targetSocketId] = targets[
+            Math.floor(Math.random() * targets.length)
+          ];
+          io.to(targetSocketId).emit('powerUpEffect', {
+            type: 'frozen',
+            duration: 3000,
+            message: 'You are frozen! ❄️'
+          });
+          socket.emit('powerUpEffect', {
+            type: 'freezeSent',
+            message: 'Freeze sent! ❄️'
+          });
+          // Notify host
+          io.to(game.hostId).emit('hostActivityLog', {
+            message: `${player.name} froze someone! ❄️`
+          });
+        } else {
+          socket.emit('powerUpEffect', {
+            type: 'freezeFailed',
+            message: 'No valid targets! ❄️'
+          });
+          // Refund powerup
+          player.powerups.push('freeze');
+        }
+        break;
+    }
+
+    // Notify host of power-up usage
+    io.to(game.hostId).emit('hostActivityLog', {
+      message: `${player.name} used ${getPowerUpName(powerupType)}`
+    });
+  });
+
 
   // HOST: Next question
   socket.on('nextQuestion', (pin) => {

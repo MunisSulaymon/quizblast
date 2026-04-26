@@ -64,7 +64,7 @@ function renderQuestionCard(q, idx) {
     <input type="text" placeholder="Enter question..." 
       value="${q.question}"
       oninput="globalQuestionsArray[${idx}].question=this.value" style="margin-bottom: 1rem;">
-    <div class="answers-grid">
+    <div class="mc-answers answers-builder answers-grid">
       ${['A', 'B', 'C', 'D'].map((l, i) => `
         <div class="answer-row" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
           <input type="radio" name="correct-${idx}" 
@@ -75,6 +75,23 @@ function renderQuestionCard(q, idx) {
             oninput="globalQuestionsArray[${idx}].answers[${i}]=this.value">
         </div>
       `).join('')}
+    </div>
+
+    <!-- Type answer section -->
+    <div class="ta-answers ${q.settings?.questionType === 'type-answer' ? '' : 'hidden'}">
+      <label>Accepted Answers 
+        <small>(press Enter to add)</small>
+      </label>
+      <div class="tags-container" id="tags-${idx}"></div>
+      <input type="text" 
+        class="ta-input" 
+        placeholder="Add acceptable answer..."
+        onkeypress="handleTagInput(event, ${idx})">
+      <label class="fuzzy-toggle">
+        <input type="checkbox" ${q.settings?.allowFuzzy !== false ? 'checked' : ''}
+          onchange="globalQuestionsArray[${idx}].settings.allowFuzzy=this.checked">
+        Allow minor typos (fuzzy matching)
+      </label>
     </div>
     <details>
       <summary>⚙️ Question Settings</summary>
@@ -90,10 +107,11 @@ function renderQuestionCard(q, idx) {
           <option value="double" ${q.settings?.pointsType === 'double' ? 'selected' : ''}>🔥 Double</option>
           <option value="none" ${q.settings?.pointsType === 'none' ? 'selected' : ''}>🚫 No Points</option>
         </select>
-        <select onchange="globalQuestionsArray[${idx}].settings.questionType=this.value">
+        <select onchange="handleQuestionTypeChange(${idx}, this.value)">
           <option value="quiz" ${q.settings?.questionType === 'quiz' ? 'selected' : ''}>📝 Quiz</option>
           <option value="true-false" ${q.settings?.questionType === 'true-false' ? 'selected' : ''}>✅ True/False</option>
           <option value="poll" ${q.settings?.questionType === 'poll' ? 'selected' : ''}>📊 Poll</option>
+          <option value="type-answer" ${q.settings?.questionType === 'type-answer' ? 'selected' : ''}>✍️ Type Answer</option>
         </select>
       </div>
     </details>
@@ -121,9 +139,29 @@ function collectSettings() {
     autoPlay: fd.get('autoPlay') === 'on',
     lobbyMusic: fd.get('lobbyMusic') || 'classic',
     nicknameFilter: fd.get('nicknameFilter') === 'on',
+    powerUpsEnabled: fd.get('powerUpsEnabled') === 'on',
     locked: false
   };
 }
+
+document.getElementById('powerups-toggle')
+  ?.addEventListener('change', function() {
+    const info = document.getElementById('powerup-info');
+    if (info) info.classList.toggle('hidden', !this.checked);
+  });
+
+socket.on('hostActivityLog', ({ message }) => {
+  const feed = document.getElementById('host-activity-feed');
+  if (!feed) return;
+  const item = document.createElement('div');
+  item.className = 'activity-item';
+  item.textContent = message;
+  feed.insertBefore(item, feed.firstChild);
+  if (feed.children.length > 5) {
+    feed.removeChild(feed.lastChild);
+  }
+  setTimeout(() => item.remove(), 5000);
+});
 
 /* ---- SOUND SETTINGS ---- */
 function handleMuteToggle(checked) {
@@ -297,7 +335,7 @@ function addQuestion() {
     <div class="q-header" style="font-weight: 700; margin-bottom: 0.5rem;">Question ${idx + 1}</div>
     <input type="text" placeholder="Enter question..." 
       oninput="globalQuestionsArray[${idx}].question=this.value" style="margin-bottom: 1rem;">
-    <div class="answers-grid">
+    <div class="mc-answers answers-builder answers-grid">
       ${['A', 'B', 'C', 'D'].map((l, i) => `
         <div class="answer-row" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
           <input type="radio" name="correct-${idx}" 
@@ -307,6 +345,23 @@ function addQuestion() {
             oninput="globalQuestionsArray[${idx}].answers[${i}]=this.value">
         </div>
       `).join('')}
+    </div>
+
+    <!-- Type answer section (hidden by default) -->
+    <div class="ta-answers hidden">
+      <label>Accepted Answers 
+        <small>(press Enter to add)</small>
+      </label>
+      <div class="tags-container" id="tags-${idx}"></div>
+      <input type="text" 
+        class="ta-input" 
+        placeholder="Add acceptable answer..."
+        onkeypress="handleTagInput(event, ${idx})">
+      <label class="fuzzy-toggle">
+        <input type="checkbox" checked
+          onchange="globalQuestionsArray[${idx}].settings.allowFuzzy=this.checked">
+        Allow minor typos (fuzzy matching)
+      </label>
     </div>
     <details>
       <summary>⚙️ Question Settings</summary>
@@ -322,10 +377,11 @@ function addQuestion() {
           <option value="double">🔥 Double</option>
           <option value="none">🚫 No Points</option>
         </select>
-        <select onchange="globalQuestionsArray[${idx}].settings.questionType=this.value">
+        <select onchange="handleQuestionTypeChange(${idx}, this.value)">
           <option value="quiz">📝 Quiz</option>
           <option value="true-false">✅ True/False</option>
           <option value="poll">📊 Poll</option>
+          <option value="type-answer">✍️ Type Answer</option>
         </select>
       </div>
     </details>
@@ -335,6 +391,59 @@ function addQuestion() {
 }
 
 document.getElementById('add-q-btn').addEventListener('click', addQuestion);
+
+function handleQuestionTypeChange(idx, type) {
+  const card = document.querySelector(`.question-card:nth-child(${idx + 1})`);
+  if (!card) return;
+
+  const mcAnswers = card.querySelector('.mc-answers');
+  const taAnswers = card.querySelector('.ta-answers');
+
+  if (type === 'type-answer') {
+    if (mcAnswers) mcAnswers.classList.add('hidden');
+    if (taAnswers) taAnswers.classList.remove('hidden');
+    globalQuestionsArray[idx].settings.questionType = 'type-answer';
+  } else {
+    if (mcAnswers) mcAnswers.classList.remove('hidden');
+    if (taAnswers) taAnswers.classList.add('hidden');
+    globalQuestionsArray[idx].settings.questionType = type;
+  }
+}
+
+function handleTagInput(event, idx) {
+  if (event.key !== 'Enter') return;
+  const input = event.target;
+  const val = input.value.trim();
+  if (!val) return;
+
+  if (!globalQuestionsArray[idx].acceptedAnswers) {
+    globalQuestionsArray[idx].acceptedAnswers = [];
+  }
+
+  if (!globalQuestionsArray[idx].acceptedAnswers.includes(val)) {
+    globalQuestionsArray[idx].acceptedAnswers.push(val);
+    renderTags(idx);
+  }
+  input.value = '';
+}
+
+function renderTags(idx) {
+  const container = document.getElementById(`tags-${idx}`);
+  if (!container) return;
+  const answers = globalQuestionsArray[idx].acceptedAnswers || [];
+  container.innerHTML = answers.map((ans, i) => `
+    <span class="answer-tag">
+      ${ans}
+      <button onclick="removeTag(${idx}, ${i})">×</button>
+    </span>
+  `).join('');
+}
+
+function removeTag(qIdx, aIdx) {
+  globalQuestionsArray[qIdx].acceptedAnswers.splice(aIdx, 1);
+  renderTags(qIdx);
+}
+
 
 function updateCreateBtn() {
   const title = document.getElementById('quiz-title').value.trim();
@@ -542,7 +651,8 @@ socket.on('playerAnswered', ({ count, total }) => {
   document.getElementById('p-answered').innerText = `${count} / ${total} Answered`;
 });
 
-socket.on('roundResults', ({ correctIndex, correctAnswer, answerCounts, leaderboard, allPlayers }) => {
+socket.on('roundResults', (data) => {
+  const { correctIndex, correctAnswer, answerCounts, typedAnswers, questionType, leaderboard, allPlayers } = data;
   soundManager.stopMusic();
   soundManager.playResults();
   document.getElementById('res-correct-text').innerText = correctAnswer;
@@ -554,6 +664,21 @@ socket.on('roundResults', ({ correctIndex, correctAnswer, answerCounts, leaderbo
     const bar = document.getElementById(`bar-${i}`);
     if (bar) bar.style.height = `${height}%`;
   });
+
+  const typeSection = document.getElementById('type-answer-section');
+  const wordDisplay = document.getElementById('answers-word-display');
+  
+  if (questionType === 'type-answer' && typedAnswers?.length > 0) {
+    if (typeSection) typeSection.classList.remove('hidden');
+    if (wordDisplay) {
+      wordDisplay.innerHTML = typedAnswers
+        .filter(a => a.trim())
+        .map(a => `<span class="word-tag">${a}</span>`)
+        .join('');
+    }
+  } else {
+    if (typeSection) typeSection.classList.add('hidden');
+  }
 
   // Update Leaderboard
   document.getElementById('results-leaderboard').innerHTML = leaderboard.map(p => `
