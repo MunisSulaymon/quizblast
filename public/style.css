@@ -1836,3 +1836,38 @@ input:checked + .slider:before { transform: translateX(24px); }
   .powerup-toast { font-size: 0.9rem; padding: 10px 18px; }
   .freeze-content h2 { font-size: 2rem; }
 }
+
+/* Fix builder input text color */
+.question-card input[type="text"],
+.question-card input[type="number"],
+.question-card select,
+#quiz-title,
+.builder-input,
+.q-settings-grid select,
+.ta-input {
+  color: #333333 !important;
+  background-color: white !important;
+}
+
+/* Fix answer inputs specifically */
+.answers-builder input[type="text"] {
+  color: #333333 !important;
+  background: white !important;
+}
+
+/* Fix question text input */
+input[placeholder="Enter your question..."],
+input[placeholder="Answer A..."],
+input[placeholder="Answer B..."],
+input[placeholder="Answer C..."],
+input[placeholder="Answer D..."] {
+  color: #333333 !important;
+}
+
+/* General builder form fix */
+.builder-card input,
+.builder-card select,
+.builder-card textarea {
+  color: #333333 !important;
+  background: white !important;
+}
