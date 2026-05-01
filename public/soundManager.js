@@ -1,3 +1,5 @@
+// Howler.js will be loaded via script tag in HTML files
+
 class ProceduralSoundManager {
   constructor() {
     this.ctx = null;
@@ -7,6 +9,9 @@ class ProceduralSoundManager {
     this.musicInterval = null;
     this.musicOscillators = [];
     this.isInitialized = false;
+    this.useKenneyAudio = true; // Flag to enable/disable Kenney audio
+    this.kenneySounds = {}; // Store Howl instances
+    this.kenneyMusic = {}; // Store music Howl instances
 
     // Load saved settings
     this.masterVolume = parseFloat(
@@ -28,6 +33,62 @@ class ProceduralSoundManager {
     this.selectedMusic = localStorage.getItem('qb_music') || 'procedural';
     this.customMusicUrl = null;
     this.customMusicAudio = null;
+
+    // Initialize Kenney audio files
+    this.initKenneyAudio();
+  }
+
+  // Initialize Kenney audio files
+  initKenneyAudio() {
+    // Sound effects mapping
+    const soundFiles = {
+      correct: 'sounds/jingles_HIT13.ogg',
+      wrong: 'sounds/explosionCrunch_000.ogg',
+      tick: 'sounds/click1.ogg',
+      urgentTick: 'sounds/laserSmall_000.ogg',
+      join: 'sounds/doorOpen_000.ogg',
+      start: 'sounds/jingles_NES05.ogg',
+      streak: 'sounds/jingles_PIZZI07.ogg',
+      results: 'sounds/jingles_STEEL03.ogg',
+      winner: 'sounds/jingles_SAX07.ogg',
+      answerLock: 'sounds/switch1.ogg',
+      doublePoints: 'sounds/laserLarge_000.ogg'
+    };
+
+    // Music files mapping
+    const musicFiles = {
+      lobby: 'sounds/spaceEngineLow_000.ogg',
+      question: 'sounds/computerNoise_000.ogg'
+    };
+
+    // Load sound effects
+    Object.keys(soundFiles).forEach(key => {
+      this.kenneySounds[key] = new Howl({
+        src: [soundFiles[key]],
+        preload: true,
+        onload: () => console.log(`✅ Loaded ${key}: ${soundFiles[key]}`),
+        onloaderror: (id, err) => {
+          console.warn(`❌ Failed to load ${key}: ${soundFiles[key]}`, err);
+          this.useKenneyAudio = false;
+        }
+      });
+    });
+
+    // Load music files
+    Object.keys(musicFiles).forEach(key => {
+      this.kenneyMusic[key] = new Howl({
+        src: [musicFiles[key]],
+        loop: true,
+        preload: true,
+        onload: () => console.log(`✅ Loaded music ${key}: ${musicFiles[key]}`),
+        onloaderror: (id, err) => {
+          console.warn(`❌ Failed to load music ${key}: ${musicFiles[key]}`, err);
+        }
+      });
+    });
+
+    // Set global Howler volume
+    Howler.volume(1.0);
   }
 
   // Initialize AudioContext (must be called after user interaction)
@@ -60,6 +121,23 @@ class ProceduralSoundManager {
     this.masterGain.gain.value = this.isMuted ? 0 : this.masterVolume;
     this.sfxGain.gain.value = this.sfxVolume;
     this.musicGain.gain.value = this.musicVolume;
+
+    // Update Howler.js volumes
+    const masterVol = this.isMuted ? 0 : this.masterVolume;
+    Howler.volume(masterVol);
+    
+    // Update individual Howl instances if needed
+    Object.values(this.kenneySounds).forEach(howl => {
+      if (howl && howl.state() === 'loaded') {
+        howl.volume(this.sfxVolume);
+      }
+    });
+    
+    Object.values(this.kenneyMusic).forEach(howl => {
+      if (howl && howl.state() === 'loaded') {
+        howl.volume(this.musicVolume);
+      }
+    });
   }
 
   setMasterVolume(val) {
@@ -119,67 +197,122 @@ class ProceduralSoundManager {
   // ===== SOUND EFFECTS =====
 
   playCorrect() {
-    this._playTone(523.25, 'sine', 0.15, 0.5);
-    this._playTone(659.25, 'sine', 0.3, 0.5, 0.1);
-    this._playTone(783.99, 'sine', 0.4, 0.4, 0.2);
+    if (this.useKenneyAudio && this.kenneySounds.correct && this.kenneySounds.correct.state() === 'loaded') {
+      this.kenneySounds.correct.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(523.25, 'sine', 0.15, 0.5);
+      this._playTone(659.25, 'sine', 0.3, 0.5, 0.1);
+      this._playTone(783.99, 'sine', 0.4, 0.4, 0.2);
+    }
   }
 
   playWrong() {
-    this._playTone(200, 'sawtooth', 0.2, 0.3);
-    this._playTone(150, 'sawtooth', 0.3, 0.3, 0.15);
-    this._playTone(100, 'sawtooth', 0.4, 0.3, 0.3);
+    if (this.useKenneyAudio && this.kenneySounds.wrong && this.kenneySounds.wrong.state() === 'loaded') {
+      this.kenneySounds.wrong.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(200, 'sawtooth', 0.2, 0.3);
+      this._playTone(150, 'sawtooth', 0.3, 0.3, 0.15);
+      this._playTone(100, 'sawtooth', 0.4, 0.3, 0.3);
+    }
   }
 
   playTick() {
-    this._playTone(800, 'square', 0.05, 0.08);
+    if (this.useKenneyAudio && this.kenneySounds.tick && this.kenneySounds.tick.state() === 'loaded') {
+      this.kenneySounds.tick.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(800, 'square', 0.05, 0.08);
+    }
   }
 
   playUrgentTick() {
-    this._playTone(1200, 'square', 0.05, 0.15);
+    if (this.useKenneyAudio && this.kenneySounds.urgentTick && this.kenneySounds.urgentTick.state() === 'loaded') {
+      this.kenneySounds.urgentTick.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(1200, 'square', 0.05, 0.15);
+    }
   }
 
   playJoin() {
-    this._playTone(440, 'sine', 0.15, 0.25);
-    this._playTone(880, 'sine', 0.3, 0.25, 0.12);
+    if (this.useKenneyAudio && this.kenneySounds.join && this.kenneySounds.join.state() === 'loaded') {
+      this.kenneySounds.join.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(440, 'sine', 0.15, 0.25);
+      this._playTone(880, 'sine', 0.3, 0.25, 0.12);
+    }
   }
 
   playStart() {
-    this._playTone(440, 'square', 0.1, 0.3);
-    this._playTone(554.37, 'square', 0.1, 0.3, 0.12);
-    this._playTone(659.25, 'square', 0.1, 0.3, 0.24);
-    this._playTone(880, 'square', 0.5, 0.3, 0.36);
+    if (this.useKenneyAudio && this.kenneySounds.start && this.kenneySounds.start.state() === 'loaded') {
+      this.kenneySounds.start.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(440, 'square', 0.1, 0.3);
+      this._playTone(554.37, 'square', 0.1, 0.3, 0.12);
+      this._playTone(659.25, 'square', 0.1, 0.3, 0.24);
+      this._playTone(880, 'square', 0.5, 0.3, 0.36);
+    }
   }
 
   playStreak() {
-    this._playTone(523.25, 'triangle', 0.1, 0.4);
-    this._playTone(659.25, 'triangle', 0.1, 0.4, 0.1);
-    this._playTone(783.99, 'triangle', 0.1, 0.4, 0.2);
-    this._playTone(1046.50, 'triangle', 0.5, 0.4, 0.3);
+    if (this.useKenneyAudio && this.kenneySounds.streak && this.kenneySounds.streak.state() === 'loaded') {
+      this.kenneySounds.streak.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(523.25, 'triangle', 0.1, 0.4);
+      this._playTone(659.25, 'triangle', 0.1, 0.4, 0.1);
+      this._playTone(783.99, 'triangle', 0.1, 0.4, 0.2);
+      this._playTone(1046.50, 'triangle', 0.5, 0.4, 0.3);
+    }
   }
 
   playResults() {
-    this._playTone(392.00, 'square', 0.1, 0.3);
-    this._playTone(523.25, 'square', 0.1, 0.3, 0.12);
-    this._playTone(659.25, 'square', 0.3, 0.3, 0.24);
+    if (this.useKenneyAudio && this.kenneySounds.results && this.kenneySounds.results.state() === 'loaded') {
+      this.kenneySounds.results.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(392.00, 'square', 0.1, 0.3);
+      this._playTone(523.25, 'square', 0.1, 0.3, 0.12);
+      this._playTone(659.25, 'square', 0.3, 0.3, 0.24);
+    }
   }
 
   playWinner() {
-    const notes = [523.25, 659.25, 783.99, 1046.50];
-    notes.forEach((f, i) => {
-      this._playTone(f, 'square', 0.2, 0.35, i * 0.15);
-    });
-    this._playTone(1046.50, 'square', 1.0, 0.35, 
-      notes.length * 0.15 + 0.1);
+    if (this.useKenneyAudio && this.kenneySounds.winner && this.kenneySounds.winner.state() === 'loaded') {
+      this.kenneySounds.winner.play();
+    } else {
+      // Fallback to procedural
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((f, i) => {
+        this._playTone(f, 'square', 0.2, 0.35, i * 0.15);
+      });
+      this._playTone(1046.50, 'square', 1.0, 0.35, 
+        notes.length * 0.15 + 0.1);
+    }
   }
 
   playAnswerLock() {
-    this._playTone(1000, 'triangle', 0.08, 0.15);
+    if (this.useKenneyAudio && this.kenneySounds.answerLock && this.kenneySounds.answerLock.state() === 'loaded') {
+      this.kenneySounds.answerLock.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(1000, 'triangle', 0.08, 0.15);
+    }
   }
 
   playDoublePoints() {
-    this._playTone(440, 'square', 0.1, 0.4);
-    this._playTone(880, 'square', 0.1, 0.4, 0.1);
-    this._playTone(1320, 'square', 0.5, 0.4, 0.2);
+    if (this.useKenneyAudio && this.kenneySounds.doublePoints && this.kenneySounds.doublePoints.state() === 'loaded') {
+      this.kenneySounds.doublePoints.play();
+    } else {
+      // Fallback to procedural
+      this._playTone(440, 'square', 0.1, 0.4);
+      this._playTone(880, 'square', 0.1, 0.4, 0.1);
+      this._playTone(1320, 'square', 0.5, 0.4, 0.2);
+    }
   }
 
   // ===== MUSIC =====
@@ -193,6 +326,13 @@ class ProceduralSoundManager {
       try { osc.stop(this.ctx.currentTime + 0.1); } catch(e){}
     });
     this.musicOscillators = [];
+
+    // Stop Kenney music
+    Object.values(this.kenneyMusic).forEach(howl => {
+      if (howl && howl.state() === 'loaded') {
+        howl.stop();
+      }
+    });
 
     // Stop custom music if playing
     if (this.customMusicAudio) {
@@ -211,7 +351,13 @@ class ProceduralSoundManager {
       return;
     }
 
-    // Procedural upbeat arpeggio
+    // Use Kenney lobby music if available
+    if (this.useKenneyAudio && this.kenneyMusic.lobby && this.kenneyMusic.lobby.state() === 'loaded') {
+      this.kenneyMusic.lobby.play();
+      return;
+    }
+
+    // Fallback to procedural upbeat arpeggio
     if (!this.ctx) return;
     const notes = [261.63, 329.63, 392.00, 523.25, 
                    659.25, 523.25, 392.00, 329.63];
@@ -234,9 +380,15 @@ class ProceduralSoundManager {
   startQuestionMusic() {
     this.stopMusic();
     if (this.selectedMusic === 'none') return;
-    if (!this.ctx) return;
 
-    // Tense pulsing bass
+    // Use Kenney question music if available
+    if (this.useKenneyAudio && this.kenneyMusic.question && this.kenneyMusic.question.state() === 'loaded') {
+      this.kenneyMusic.question.play();
+      return;
+    }
+
+    // Fallback to procedural tense pulsing bass
+    if (!this.ctx) return;
     let step = 0;
     this.musicInterval = setInterval(() => {
       if (!this.ctx || this.ctx.state !== 'running') return;
